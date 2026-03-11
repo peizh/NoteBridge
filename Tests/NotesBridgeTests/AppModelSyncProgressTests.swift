@@ -170,6 +170,13 @@ private struct StubAppleNotesSyncDataSource: AppleNotesSyncDataSourcing {
         .resolved(rootPath: path)
     }
 
+    func inspectDataFolder(at path: String) -> AppleNotesDataFolderAccessStatus {
+        AppleNotesDataFolderAccessStatus(
+            level: .accessible,
+            message: "The configured Apple Notes data folder is readable."
+        )
+    }
+
     func fetchFolders(fromDataFolder path: String) throws -> [AppleNotesFolder] {
         folders
     }
@@ -208,8 +215,10 @@ private struct StubSyncEngine: Syncing {
     func sync(
         document: AppleNotesSyncDocument,
         settings: AppSettings,
-        existingRelativePath: String?
-    ) throws -> SyncRecord {
+        existingRelativePath: String?,
+        plannedRelativePath: String,
+        plannedRelativePathsBySourceIdentifier: [String: String]
+    ) throws -> NoteSyncResult {
         if syncDelay > 0 {
             Thread.sleep(forTimeInterval: syncDelay)
         }
@@ -218,10 +227,13 @@ private struct StubSyncEngine: Syncing {
             throw StubSyncError.failed
         }
 
-        return SyncRecord(
-            noteID: document.id,
-            relativePath: "\(document.displayName).md",
-            sourceUpdatedAt: document.updatedAt
+        return NoteSyncResult(
+            record: SyncRecord(
+                noteID: document.id,
+                relativePath: plannedRelativePath,
+                sourceUpdatedAt: document.updatedAt
+            ),
+            unresolvedInternalLinkCount: 0
         )
     }
 }

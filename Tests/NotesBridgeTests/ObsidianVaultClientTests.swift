@@ -102,6 +102,7 @@ struct ObsidianVaultClientTests {
 
         let note = AppleNotesSyncDocument(
             databaseNoteID: 42,
+            sourceNoteIdentifier: "x-coredata://legacy/ICNote/p42",
             legacyNoteID: "x-coredata://legacy/ICNote/p42",
             name: "Daily Note",
             folder: "Inbox",
@@ -136,7 +137,8 @@ struct ObsidianVaultClientTests {
         let fileContents = try String(contentsOf: export.fileURL, encoding: .utf8)
         let attachmentRoot = vaultURL.appendingPathComponent("_attachments/Apple Notes/Inbox/Daily Note", isDirectory: true)
 
-        #expect(fileContents.contains("apple_notes_id: \"apple-notes-db://note/42\""))
+        #expect(fileContents.contains("apple_notes_id: \"applenotes:note/x-coredata://legacy/ICNote/p42\""))
+        #expect(fileContents.contains("apple_notes_sync_id: \"apple-notes-db://note/42\""))
         #expect(fileContents.contains("apple_notes_legacy_id: \"x-coredata://legacy/ICNote/p42\""))
         #expect(fileContents.contains("![[_attachments/Apple Notes/Inbox/Daily Note/photo.png]]"))
         #expect(fileContents.contains("[[_attachments/Apple Notes/Inbox/Daily Note/archive.zip]]"))
@@ -310,6 +312,175 @@ struct ObsidianVaultClientTests {
                 atPath: vaultURL.appendingPathComponent("assets/Apple Notes/Inbox/Daily Note/photo.png").path
             )
         )
+    }
+
+    @Test
+    func rendersInternalLinksUsingPlannedRelativePathAndAlias() throws {
+        let vaultURL = try makeTemporaryVault()
+        defer { try? FileManager.default.removeItem(at: vaultURL) }
+
+        var settings = AppSettings.default
+        settings.vaultPath = vaultURL.path
+
+        let note = AppleNotesSyncDocument(
+            databaseNoteID: 12,
+            sourceNoteIdentifier: "SOURCE-CURRENT",
+            name: "9/4/2025",
+            folder: "Journal",
+            folderPath: "Rocky's Digital Garden/Journal",
+            createdAt: nil,
+            updatedAt: nil,
+            shared: false,
+            passwordProtected: false,
+            markdownTemplate: "See {{note-link:journal-link}}",
+            internalLinks: [
+                AppleNotesSyncInternalLink(
+                    token: "journal-link",
+                    targetSourceIdentifier: "TARGET-NOTE",
+                    displayText: "9/3/2025"
+                ),
+            ],
+            attachments: []
+        )
+
+        let export = try client.export(
+            note: note,
+            settings: settings,
+            existingRelativePath: nil,
+            plannedRelativePath: "Apple Notes/Rocky's Digital Garden/Journal/9-4-2025.md",
+            plannedRelativePathsBySourceIdentifier: [
+                "TARGET-NOTE": "Apple Notes/Rocky's Digital Garden/Journal/9-3-2025.md",
+            ]
+        )
+        let fileContents = try String(contentsOf: export.fileURL, encoding: .utf8)
+
+        #expect(fileContents.contains("[[Apple Notes/Rocky's Digital Garden/Journal/9-3-2025|9/3/2025]]"))
+        #expect(export.unresolvedInternalLinkCount == 0)
+    }
+
+    @Test
+    func usesCollisionResolvedTargetPathsForInternalLinks() throws {
+        let vaultURL = try makeTemporaryVault()
+        defer { try? FileManager.default.removeItem(at: vaultURL) }
+
+        var settings = AppSettings.default
+        settings.vaultPath = vaultURL.path
+
+        let note = AppleNotesSyncDocument(
+            databaseNoteID: 13,
+            name: "Current Note",
+            folder: "Inbox",
+            createdAt: nil,
+            updatedAt: nil,
+            shared: false,
+            passwordProtected: false,
+            markdownTemplate: "{{note-link:daily-link}}",
+            internalLinks: [
+                AppleNotesSyncInternalLink(
+                    token: "daily-link",
+                    targetSourceIdentifier: "TARGET-DAILY",
+                    displayText: "Daily Note"
+                ),
+            ],
+            attachments: []
+        )
+
+        let export = try client.export(
+            note: note,
+            settings: settings,
+            existingRelativePath: nil,
+            plannedRelativePath: "Apple Notes/Inbox/Current Note.md",
+            plannedRelativePathsBySourceIdentifier: [
+                "TARGET-DAILY": "Apple Notes/Inbox/Daily Note 2.md",
+            ]
+        )
+        let fileContents = try String(contentsOf: export.fileURL, encoding: .utf8)
+
+        #expect(fileContents.contains("[[Apple Notes/Inbox/Daily Note 2|Daily Note]]"))
+        #expect(export.unresolvedInternalLinkCount == 0)
+    }
+
+    @Test
+    func resolvesXCoreDataInternalLinksThroughCanonicalDatabaseIDFallback() throws {
+        let vaultURL = try makeTemporaryVault()
+        defer { try? FileManager.default.removeItem(at: vaultURL) }
+
+        var settings = AppSettings.default
+        settings.vaultPath = vaultURL.path
+
+        let note = AppleNotesSyncDocument(
+            databaseNoteID: 15,
+            name: "Current Note",
+            folder: "Inbox",
+            createdAt: nil,
+            updatedAt: nil,
+            shared: false,
+            passwordProtected: false,
+            markdownTemplate: "{{note-link:journal-link}}",
+            internalLinks: [
+                AppleNotesSyncInternalLink(
+                    token: "journal-link",
+                    targetSourceIdentifier: "x-coredata://625E753D-DB29-4635-93F4-C869C2726CCF/ICNote/p5916",
+                    displayText: "Roadmap Q3"
+                ),
+            ],
+            attachments: []
+        )
+
+        let export = try client.export(
+            note: note,
+            settings: settings,
+            existingRelativePath: nil,
+            plannedRelativePath: "Apple Notes/Inbox/Current Note.md",
+            plannedRelativePathsBySourceIdentifier: [
+                AppleNotesSyncDocument.canonicalID(for: 5916): "Apple Notes/NotesBridge Fixtures/Projects/Specs/Roadmap Q3.md",
+            ]
+        )
+        let fileContents = try String(contentsOf: export.fileURL, encoding: .utf8)
+
+        #expect(fileContents.contains("[[Apple Notes/NotesBridge Fixtures/Projects/Specs/Roadmap Q3|Roadmap Q3]]"))
+        #expect(export.unresolvedInternalLinkCount == 0)
+    }
+
+    @Test
+    func fallsBackToPlainTextWhenInternalLinkTargetIsMissing() throws {
+        let vaultURL = try makeTemporaryVault()
+        defer { try? FileManager.default.removeItem(at: vaultURL) }
+
+        var settings = AppSettings.default
+        settings.vaultPath = vaultURL.path
+
+        let note = AppleNotesSyncDocument(
+            databaseNoteID: 14,
+            name: "Current Note",
+            folder: "Inbox",
+            createdAt: nil,
+            updatedAt: nil,
+            shared: false,
+            passwordProtected: false,
+            markdownTemplate: "See {{note-link:missing-link}}",
+            internalLinks: [
+                AppleNotesSyncInternalLink(
+                    token: "missing-link",
+                    targetSourceIdentifier: "MISSING-TARGET",
+                    displayText: "9/3/2025"
+                ),
+            ],
+            attachments: []
+        )
+
+        let export = try client.export(
+            note: note,
+            settings: settings,
+            existingRelativePath: nil,
+            plannedRelativePath: "Apple Notes/Inbox/Current Note.md",
+            plannedRelativePathsBySourceIdentifier: [:]
+        )
+        let fileContents = try String(contentsOf: export.fileURL, encoding: .utf8)
+
+        #expect(fileContents.contains("See 9/3/2025"))
+        #expect(!fileContents.contains("[[9/3/2025]]"))
+        #expect(export.unresolvedInternalLinkCount == 1)
     }
 
     private func note(

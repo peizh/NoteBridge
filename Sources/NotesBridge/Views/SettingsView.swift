@@ -198,12 +198,24 @@ struct SettingsView: View {
                             .foregroundStyle(appModel.hasAppleNotesDataFolderConfigured ? .primary : .secondary)
                     }
 
+                    LabeledContent("Access") {
+                        Text(appModel.appleNotesDataAccessLabel)
+                            .foregroundStyle(appleNotesAccessColor)
+                    }
+
                     Button("Choose Apple Notes Data Folder") {
                         appModel.chooseAppleNotesDataFolder()
                     }
 
                     Text("Choose the macOS Apple Notes container folder named group.com.apple.notes so NotesBridge can read NoteStore.sqlite and native attachments.")
                         .foregroundStyle(.secondary)
+
+                    if let appleNotesDataAccessStatus = appModel.appleNotesDataAccessStatus {
+                        Text(appleNotesDataAccessStatus.message)
+                            .foregroundStyle(
+                                appleNotesDataAccessStatus.level == .accessible ? Color.secondary : Color.orange
+                            )
+                    }
                 }
 
                 Section("Indexing & Sync") {
@@ -267,6 +279,19 @@ struct SettingsView: View {
             .formStyle(.grouped)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    private var appleNotesAccessColor: Color {
+        switch appModel.appleNotesDataAccessStatus?.level {
+        case .accessible:
+            return .green
+        case .limited:
+            return .orange
+        case .invalid:
+            return .red
+        case nil:
+            return .secondary
+        }
     }
 
     @ViewBuilder

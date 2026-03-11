@@ -37,6 +37,56 @@ struct AppleNotesDatabaseSyncSourceTests {
     }
 
     @Test
+    func reportsLimitedAccessWhenOnlyRootDatabaseIsVisible() throws {
+        let rootURL = try makeDataFolder(
+            noteStoreRelativePaths: [
+                "NoteStore.sqlite",
+            ]
+        )
+        defer { try? FileManager.default.removeItem(at: rootURL.deletingLastPathComponent()) }
+
+        let inspection = dataSource.inspectDataFolder(at: rootURL.path)
+
+        #expect(inspection.level == .limited)
+    }
+
+    @Test
+    func reportsAccessibleAccessWhenRootDatabaseAlreadyContainsNotes() throws {
+        let rootURL = URL(fileURLWithPath: "/tmp/group.com.apple.notes", isDirectory: true)
+        let candidateScan = AppleNotesDatabaseCandidateScan(
+            candidateURLs: [rootURL.appendingPathComponent("NoteStore.sqlite", isDirectory: false)],
+            rootCandidatePresent: true,
+            accountsDirectoryExists: true,
+            accountsIsDirectory: true,
+            localAccountCandidatePresent: false,
+            rootEntries: ["Accounts", "NoteStore.sqlite"],
+            accountDirectoryNames: [".DS_Store{hidden}"],
+            accountsEnumerationError: nil
+        )
+        let candidateReport = AppleNotesDatabaseCandidateReport(
+            rootURL: rootURL,
+            databaseURL: rootURL.appendingPathComponent("NoteStore.sqlite", isDirectory: false),
+            folderCount: 5,
+            totalNoteCount: 12,
+            documentCount: 12,
+            skippedLockedNotes: 0,
+            folderTitleColumn: "ztitle2",
+            noteTitleColumn: "ztitle1",
+            noteFolderColumn: "zfolder",
+            folderReferenceStats: []
+        )
+
+        let inspection = dataSource.resolvedAccessStatus(
+            rootURL: rootURL,
+            candidateScan: candidateScan,
+            candidateReports: [candidateReport]
+        )
+
+        #expect(inspection.level == .accessible)
+        #expect(inspection.message.contains("sync can proceed using the root database"))
+    }
+
+    @Test
     func rejectsNonGroupContainerSelections() throws {
         let baseURL = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         let invalidURL = baseURL.appendingPathComponent("wrong-folder", isDirectory: true)

@@ -4,12 +4,18 @@ import Foundation
 struct ObsidianExportResult: Sendable {
     let fileURL: URL
     let relativePath: String
+    let unresolvedInternalLinkCount: Int
 }
 
 struct ObsidianAttachmentStorageResolution: Sendable {
     let baseRelativePath: String
     let sourceDescription: String
     let warning: String?
+}
+
+private struct RenderedMarkdownResult: Sendable {
+    let markdown: String
+    let unresolvedInternalLinkCount: Int
 }
 
 enum ObsidianVaultError: LocalizedError {
@@ -27,21 +33,24 @@ struct ObsidianVaultClient: Sendable {
     func export(
         note: AppleNotesSyncDocument,
         settings: AppSettings,
-        existingRelativePath: String?
+        existingRelativePath: String?,
+        plannedRelativePath: String? = nil,
+        plannedRelativePathsBySourceIdentifier: [String: String] = [:]
     ) throws -> ObsidianExportResult {
         let fileManager = FileManager.default
         let vaultURL = try vaultURL(for: settings)
-        let relativePath = resolveRelativePath(
-            for: note,
-            settings: settings,
-            existingRelativePath: existingRelativePath
-        ) { candidateRelativePath in
-            if candidateRelativePath == existingRelativePath {
-                return false
-            }
+        let relativePath = plannedRelativePath
+            ?? resolveRelativePath(
+                for: note,
+                settings: settings,
+                existingRelativePath: existingRelativePath
+            ) { candidateRelativePath in
+                if candidateRelativePath == existingRelativePath {
+                    return false
+                }
 
-            return fileManager.fileExists(atPath: vaultURL.appendingPathComponent(candidateRelativePath).path)
-        }
+                return fileManager.fileExists(atPath: vaultURL.appendingPathComponent(candidateRelativePath).path)
+            }
         let fileURL = vaultURL.appendingPathComponent(relativePath)
         try fileManager.createDirectory(at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
         let obsoleteAttachmentDirectories = attachmentMigrationCandidates(
@@ -76,7 +85,8 @@ struct ObsidianVaultClient: Sendable {
             fileURL: fileURL,
             vaultURL: vaultURL,
             settings: settings,
-            fileManager: fileManager
+            fileManager: fileManager,
+            plannedRelativePathsBySourceIdentifier: plannedRelativePathsBySourceIdentifier
         )
         try removeObsoleteAttachmentDirectories(
             obsoleteAttachmentDirectories,
@@ -88,10 +98,14 @@ struct ObsidianVaultClient: Sendable {
             fileManager: fileManager
         )
         let frontMatter = frontMatter(for: note)
-        let contents = frontMatter + renderedMarkdown.trimmingCharacters(in: .whitespacesAndNewlines) + "\n"
+        let contents = frontMatter + renderedMarkdown.markdown.trimmingCharacters(in: .whitespacesAndNewlines) + "\n"
         try contents.write(to: fileURL, atomically: true, encoding: .utf8)
 
-        return ObsidianExportResult(fileURL: fileURL, relativePath: relativePath)
+        return ObsidianExportResult(
+            fileURL: fileURL,
+            relativePath: relativePath,
+            unresolvedInternalLinkCount: renderedMarkdown.unresolvedInternalLinkCount
+        )
     }
 
     func revealVault(at path: String) {
@@ -190,8 +204,9 @@ struct ObsidianVaultClient: Sendable {
         fileURL: URL,
         vaultURL: URL,
         settings: AppSettings,
-        fileManager: FileManager
-    ) throws -> String {
+        fileManager: FileManager,
+        plannedRelativePathsBySourceIdentifier: [String: String]
+    ) throws -> RenderedMarkdownResult {
         var markdown = note.markdownTemplate
         let attachmentDirectoryURL = attachmentDirectoryURL(
             forNoteRelativePath: noteRelativePath,
@@ -214,7 +229,11 @@ struct ObsidianVaultClient: Sendable {
             {
                 try? fileManager.removeItem(at: legacyAttachmentDirectoryURL)
             }
-            return markdown
+            return renderInternalLinks(
+                in: markdown,
+                for: note,
+                plannedRelativePathsBySourceIdentifier: plannedRelativePathsBySourceIdentifier
+            )
         }
 
         try fileManager.createDirectory(at: attachmentDirectoryURL, withIntermediateDirectories: true)
@@ -255,7 +274,49 @@ struct ObsidianVaultClient: Sendable {
             fileManager: fileManager
         )
 
-        return markdown
+        return renderInternalLinks(
+            in: markdown,
+            for: note,
+            plannedRelativePathsBySourceIdentifier: plannedRelativePathsBySourceIdentifier
+        )
+    }
+
+    private func renderInternalLinks(
+        in markdown: String,
+        for note: AppleNotesSyncDocument,
+        plannedRelativePathsBySourceIdentifier: [String: String]
+    ) -> RenderedMarkdownResult {
+        var renderedMarkdown = markdown
+        var unresolvedInternalLinkCount = 0
+
+        for internalLink in note.internalLinks {
+            let normalizedTargetIdentifier = AppleNotesSyncDocument.normalizedSourceIdentifier(
+                internalLink.targetSourceIdentifier
+            )
+            let replacement: String
+
+            let targetRelativePath = plannedRelativePathsBySourceIdentifier[normalizedTargetIdentifier]
+                ?? AppleNotesSyncDocument.databaseNoteID(fromIdentifier: internalLink.targetSourceIdentifier)
+                    .flatMap { plannedRelativePathsBySourceIdentifier[AppleNotesSyncDocument.canonicalID(for: $0)] }
+
+            if let targetRelativePath {
+                let wikiTargetPath = (targetRelativePath as NSString).deletingPathExtension
+                replacement = "[[\(wikiTargetPath)|\(internalLink.displayText)]]"
+            } else {
+                replacement = internalLink.displayText
+                unresolvedInternalLinkCount += 1
+            }
+
+            renderedMarkdown = renderedMarkdown.replacingOccurrences(
+                of: "{{note-link:\(internalLink.token)}}",
+                with: replacement
+            )
+        }
+
+        return RenderedMarkdownResult(
+            markdown: renderedMarkdown,
+            unresolvedInternalLinkCount: unresolvedInternalLinkCount
+        )
     }
 
     private func moveNoteFileIfNeeded(
@@ -369,8 +430,13 @@ struct ObsidianVaultClient: Sendable {
         var lines = [
             "---",
             "source: \"apple-notes\"",
-            "apple_notes_id: \"\(yamlEscaped(note.id))\"",
         ]
+        if let appleNotesDeepLink = note.appleNotesDeepLink {
+            lines.append("apple_notes_id: \"\(yamlEscaped(appleNotesDeepLink))\"")
+        } else {
+            lines.append("apple_notes_id: \"\(yamlEscaped(note.id))\"")
+        }
+        lines.append("apple_notes_sync_id: \"\(yamlEscaped(note.id))\"")
         if let legacyNoteID = note.legacyNoteID, legacyNoteID != note.id {
             lines.append("apple_notes_legacy_id: \"\(yamlEscaped(legacyNoteID))\"")
         }
@@ -449,6 +515,9 @@ struct ObsidianVaultClient: Sendable {
 
             if let identifier = frontMatterValue(forKey: "apple_notes_id", in: String(line)) {
                 identifiers.append(identifier)
+            }
+            if let syncIdentifier = frontMatterValue(forKey: "apple_notes_sync_id", in: String(line)) {
+                identifiers.append(syncIdentifier)
             }
             if let legacyIdentifier = frontMatterValue(forKey: "apple_notes_legacy_id", in: String(line)) {
                 identifiers.append(legacyIdentifier)

@@ -185,6 +185,13 @@ private struct UITestAppleNotesSyncDataSource: AppleNotesSyncDataSourcing {
         AppleNotesDataFolderSelection.resolved(rootPath: path, databaseRelativePath: "NoteStore.sqlite")
     }
 
+    func inspectDataFolder(at path: String) -> AppleNotesDataFolderAccessStatus {
+        AppleNotesDataFolderAccessStatus(
+            level: .accessible,
+            message: "The configured Apple Notes data folder is readable."
+        )
+    }
+
     func fetchFolders(fromDataFolder path: String) throws -> [AppleNotesFolder] {
         UITestFixtures.folders
     }
@@ -223,6 +230,7 @@ private enum UITestFixtures {
     static let documents = [
         AppleNotesSyncDocument(
             databaseNoteID: 101,
+            sourceNoteIdentifier: "SOURCE-FIRST",
             folderDatabaseID: 1,
             name: "First Note",
             folder: "Inbox",
@@ -230,11 +238,19 @@ private enum UITestFixtures {
             updatedAt: nil,
             shared: false,
             passwordProtected: false,
-            markdownTemplate: "First body",
+            markdownTemplate: "First body\n{{note-link:roadmap-link}}",
+            internalLinks: [
+                AppleNotesSyncInternalLink(
+                    token: "roadmap-link",
+                    targetSourceIdentifier: "SOURCE-ROADMAP",
+                    displayText: "Roadmap"
+                ),
+            ],
             attachments: []
         ),
         AppleNotesSyncDocument(
             databaseNoteID: 102,
+            sourceNoteIdentifier: "SOURCE-SECOND",
             folderDatabaseID: 1,
             name: "Second Note",
             folder: "Inbox",
@@ -247,6 +263,7 @@ private enum UITestFixtures {
         ),
         AppleNotesSyncDocument(
             databaseNoteID: 201,
+            sourceNoteIdentifier: "SOURCE-ROADMAP",
             folderDatabaseID: 2,
             name: "Roadmap",
             folder: "Specs",

@@ -1,6 +1,79 @@
 import AppKit
 import Combine
 import Foundation
+import OSLog
+
+private struct AppleNotesDataFolderAccessSession {
+    let url: URL
+    private let stopAccessingImpl: @Sendable () -> Void
+
+    init(url: URL, stopAccessingImpl: @escaping @Sendable () -> Void) {
+        self.url = url
+        self.stopAccessingImpl = stopAccessingImpl
+    }
+
+    func stopAccessing() {
+        stopAccessingImpl()
+    }
+}
+
+private func makeAppleNotesDataFolderAccessSession(
+    path: String?,
+    bookmarkData: Data?
+) -> AppleNotesDataFolderAccessSession? {
+    if let bookmarkData {
+        AppLog.access.debug("Resolving Apple Notes bookmark. bytes=\(bookmarkData.count)")
+        do {
+            var isStale = false
+            let url = try URL(
+                resolvingBookmarkData: bookmarkData,
+                options: [.withSecurityScope, .withoutUI],
+                relativeTo: nil,
+                bookmarkDataIsStale: &isStale
+            )
+            AppLog.access.info(
+                "Resolved Apple Notes bookmark to \(url.path, privacy: .public); stale=\(isStale)"
+            )
+            let startedAccessing = url.startAccessingSecurityScopedResource()
+            AppLog.access.info(
+                "startAccessingSecurityScopedResource(bookmark) for \(url.path, privacy: .public) -> \(startedAccessing)"
+            )
+            return AppleNotesDataFolderAccessSession(url: url) {
+                if startedAccessing {
+                    url.stopAccessingSecurityScopedResource()
+                    AppLog.access.debug(
+                        "Stopped Apple Notes security-scoped access for \(url.path, privacy: .public)"
+                    )
+                }
+            }
+        } catch {
+            AppLog.access.error(
+                "Failed to resolve Apple Notes bookmark: \(error.localizedDescription, privacy: .public)"
+            )
+            // Fall through to path-based access below.
+        }
+    }
+
+    guard let path,
+          !path.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    else {
+        return nil
+    }
+
+    let url = URL(fileURLWithPath: path, isDirectory: true).standardizedFileURL
+    let startedAccessing = url.startAccessingSecurityScopedResource()
+    AppLog.access.info(
+        "Using path-based Apple Notes access for \(url.path, privacy: .public); startAccessingSecurityScopedResource -> \(startedAccessing)"
+    )
+    return AppleNotesDataFolderAccessSession(url: url) {
+        if startedAccessing {
+            url.stopAccessingSecurityScopedResource()
+            AppLog.access.debug(
+                "Stopped path-based Apple Notes access for \(url.path, privacy: .public)"
+            )
+        }
+    }
+}
 
 @MainActor
 final class AppModel: ObservableObject {
@@ -8,6 +81,7 @@ final class AppModel: ObservableObject {
         didSet {
             persistSettings()
             notesContextMonitor.updateSettings(settings)
+            refreshAppleNotesDataAccessStatus()
         }
     }
 
@@ -21,6 +95,7 @@ final class AppModel: ObservableObject {
     @Published private(set) var syncProgress: SyncProgress?
     @Published private(set) var slashKeyboardNavigationAvailable = true
     @Published private(set) var slashDiagnostics: [String] = []
+    @Published private(set) var appleNotesDataAccessStatus: AppleNotesDataFolderAccessStatus?
     @Published var errorMessage: String?
     @Published var statusMessage = "Ready" {
         didSet {
@@ -116,6 +191,19 @@ final class AppModel: ObservableObject {
     var hasAppleNotesDataFolderConfigured: Bool {
         guard let appleNotesDataPath = settings.appleNotesDataPath else { return false }
         return !appleNotesDataPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    var appleNotesDataAccessLabel: String {
+        switch appleNotesDataAccessStatus?.level {
+        case .accessible:
+            return "Accessible"
+        case .limited:
+            return "Limited"
+        case .invalid:
+            return "Invalid"
+        case nil:
+            return "Not configured"
+        }
     }
 
     var syncedNoteCount: Int {
@@ -297,10 +385,23 @@ final class AppModel: ObservableObject {
         }
 
         do {
+            let bookmarkData = try url.bookmarkData(
+                options: [.withSecurityScope],
+                includingResourceValuesForKeys: nil,
+                relativeTo: nil
+            )
+            AppLog.access.info(
+                "User selected Apple Notes data folder: \(url.path, privacy: .public); bookmarkBytes=\(bookmarkData.count)"
+            )
             let selection = try appleNotesSyncDataSource.validateDataFolder(at: url.path)
             settings.appleNotesDataPath = selection.rootURL.path
+            settings.appleNotesDataBookmark = bookmarkData
+            refreshAppleNotesDataAccessStatus()
             statusMessage = "Apple Notes data folder set to \(selection.rootURL.lastPathComponent)."
         } catch {
+            AppLog.access.error(
+                "Failed to select Apple Notes data folder: \(error.localizedDescription, privacy: .public)"
+            )
             present(error, fallback: "Failed to access Apple Notes data folder.")
         }
     }
@@ -310,14 +411,17 @@ final class AppModel: ObservableObject {
         vaultClient.revealVault(at: vaultPath)
     }
 
-    private func ensureAppleNotesDataFolderSelectionForSync() -> AppleNotesDataFolderSelection? {
-        if let appleNotesDataPath = settings.appleNotesDataPath,
-           !appleNotesDataPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        {
+    private func ensureAppleNotesDataFolderSelectionForSync() -> (selection: AppleNotesDataFolderSelection, accessSession: AppleNotesDataFolderAccessSession?)? {
+        if let accessSession = resolveAppleNotesDataFolderAccessSession() {
             do {
-                return try appleNotesSyncDataSource.validateDataFolder(at: appleNotesDataPath)
+                let selection = try appleNotesSyncDataSource.validateDataFolder(at: accessSession.url.path)
+                refreshAppleNotesDataAccessStatus()
+                return (selection, accessSession)
             } catch {
+                accessSession.stopAccessing()
                 settings.appleNotesDataPath = nil
+                settings.appleNotesDataBookmark = nil
+                refreshAppleNotesDataAccessStatus()
             }
         }
 
@@ -327,10 +431,23 @@ final class AppModel: ObservableObject {
         }
 
         do {
+            let bookmarkData = try selectedURL.bookmarkData(
+                options: [.withSecurityScope],
+                includingResourceValuesForKeys: nil,
+                relativeTo: nil
+            )
             let selection = try appleNotesSyncDataSource.validateDataFolder(at: selectedURL.path)
             settings.appleNotesDataPath = selection.rootURL.path
+            settings.appleNotesDataBookmark = bookmarkData
+            refreshAppleNotesDataAccessStatus()
             statusMessage = "Apple Notes data folder set to \(selection.rootURL.lastPathComponent)."
-            return selection
+            return (
+                selection,
+                makeAppleNotesDataFolderAccessSession(
+                    path: selectedURL.path,
+                    bookmarkData: bookmarkData
+                )
+            )
         } catch {
             present(error, fallback: "Failed to access Apple Notes data folder.")
             return nil
@@ -349,6 +466,7 @@ final class AppModel: ObservableObject {
         let notesClient = self.notesClient
         let appleNotesSyncDataSource = self.appleNotesSyncDataSource
         let appleNotesDataPath = self.settings.appleNotesDataPath
+        let appleNotesDataBookmark = self.settings.appleNotesDataBookmark
         isRefreshingFolders = true
         statusMessage = "Refreshing Apple Notes folders..."
 
@@ -358,8 +476,14 @@ final class AppModel: ObservableObject {
 
         do {
             let fetchedFolders = try await Task.detached(priority: .userInitiated) {
-                if let appleNotesDataPath, !appleNotesDataPath.isEmpty {
-                    return try appleNotesSyncDataSource.fetchFolders(fromDataFolder: appleNotesDataPath)
+                if let accessSession = makeAppleNotesDataFolderAccessSession(
+                    path: appleNotesDataPath,
+                    bookmarkData: appleNotesDataBookmark
+                ) {
+                    defer {
+                        accessSession.stopAccessing()
+                    }
+                    return try appleNotesSyncDataSource.fetchFolders(fromDataFolder: accessSession.url.path)
                 }
                 return try notesClient.fetchFolders()
             }.value
@@ -379,14 +503,16 @@ final class AppModel: ObservableObject {
             return
         }
 
-        guard let dataFolderSelection = ensureAppleNotesDataFolderSelectionForSync() else {
+        guard let dataFolderAccess = ensureAppleNotesDataFolderSelectionForSync() else {
             return
         }
+        let dataFolderSelection = dataFolderAccess.selection
 
         let appleNotesSyncDataSource = self.appleNotesSyncDataSource
         let syncEngine = self.syncEngine
         let vaultClient = self.vaultClient
         let settings = self.settings
+        let dataFolderBookmark = self.settings.appleNotesDataBookmark
         let existingRecords = self.syncIndex.records
         let progressReporter = makeSyncProgressReporter()
 
@@ -400,6 +526,7 @@ final class AppModel: ObservableObject {
             isSyncing = false
             stopSyncAnimation()
             syncProgress = nil
+            dataFolderAccess.accessSession?.stopAccessing()
         }
 
         do {
@@ -508,13 +635,105 @@ final class AppModel: ObservableObject {
                     return (groups, unmatchedDocuments.count)
                 }
 
+                func planExports(
+                    groups: [FolderExportGroup],
+                    indexedRelativePaths: [String: String]
+                ) -> ([PlannedFolderExportGroup], [String: String], Set<String>) {
+                    var occupiedRelativePaths = Set(indexedRelativePaths.values)
+                    var plannedRelativePathsBySourceIdentifier: [String: String] = [:]
+                    var migratedLegacyIDs: Set<String> = []
+                    var plannedGroups: [PlannedFolderExportGroup] = []
+
+                    for group in groups {
+                        var plannedDocuments: [PlannedDocumentExport] = []
+
+                        for var document in group.documents {
+                            if let legacyID = legacyIdentifier(
+                                for: document.databaseNoteID,
+                                indexedRelativePaths: indexedRelativePaths
+                            ),
+                            document.legacyNoteID == nil,
+                            legacyID != document.id
+                            {
+                                document.legacyNoteID = legacyID
+                                migratedLegacyIDs.insert(legacyID)
+                            }
+
+                            let existingRelativePath = existingRelativePath(
+                                for: document.id,
+                                indexedRelativePaths: indexedRelativePaths
+                            ) ?? document.legacyNoteID.flatMap {
+                                existingRelativePath(for: $0, indexedRelativePaths: indexedRelativePaths)
+                            }
+
+                            let plannedRelativePath = vaultClient.plannedRelativePath(
+                                for: document,
+                                settings: settings,
+                                existingRelativePath: existingRelativePath,
+                                occupiedRelativePaths: occupiedRelativePaths
+                            )
+
+                            if let existingRelativePath,
+                               existingRelativePath != plannedRelativePath
+                            {
+                                occupiedRelativePaths.remove(existingRelativePath)
+                            }
+                            occupiedRelativePaths.insert(plannedRelativePath)
+                            plannedRelativePathsBySourceIdentifier[document.sourceNoteIdentifier] = plannedRelativePath
+                            plannedRelativePathsBySourceIdentifier[document.id] = plannedRelativePath
+                            plannedDocuments.append(
+                                PlannedDocumentExport(
+                                    document: document,
+                                    existingRelativePath: existingRelativePath,
+                                    plannedRelativePath: plannedRelativePath
+                                )
+                            )
+                        }
+
+                        plannedGroups.append(
+                            PlannedFolderExportGroup(
+                                displayName: group.displayName,
+                                documents: plannedDocuments,
+                                skippedCount: group.skippedCount,
+                                isFallback: group.isFallback
+                            )
+                        )
+                    }
+
+                    return (plannedGroups, plannedRelativePathsBySourceIdentifier, migratedLegacyIDs)
+                }
+
                 let loadSnapshotStart = Date()
-                let snapshot = try appleNotesSyncDataSource.loadSnapshot(fromDataFolder: dataFolderSelection.rootURL.path)
+                let snapshot = try {
+                    if let accessSession = makeAppleNotesDataFolderAccessSession(
+                        path: dataFolderSelection.rootURL.path,
+                        bookmarkData: dataFolderBookmark
+                    ) {
+                        defer {
+                            accessSession.stopAccessing()
+                        }
+                        return try appleNotesSyncDataSource.loadSnapshot(fromDataFolder: accessSession.url.path)
+                    }
+                    return try appleNotesSyncDataSource.loadSnapshot(fromDataFolder: dataFolderSelection.rootURL.path)
+                }()
                 timings.loadSnapshot = Date().timeIntervalSince(loadSnapshotStart)
+                let totalSnapshotNotes = snapshot.folders.reduce(0) { $0 + $1.noteCount }
+                AppLog.sync.info(
+                    "Loaded snapshot with \(snapshot.folders.count) folder(s), \(snapshot.documents.count) document(s), \(snapshot.skippedLockedNotes) locked note(s), totalNoteCount=\(totalSnapshotNotes)."
+                )
+
+                if snapshot.documents.isEmpty,
+                   totalSnapshotNotes > snapshot.skippedLockedNotes
+                {
+                    throw FullSyncExecutionError.emptySnapshot(
+                        "Loaded 0 documents from the Apple Notes snapshot even though \(totalSnapshotNotes - snapshot.skippedLockedNotes) note(s) appear syncable. \(snapshot.sourceDiagnostics ?? "")"
+                    )
+                }
 
                 let scanExistingStart = Date()
                 let indexedRelativePaths = try vaultClient.indexExistingNotes(settings: settings)
                 timings.scanExisting = Date().timeIntervalSince(scanExistingStart)
+                AppLog.sync.info("Indexed \(indexedRelativePaths.count) existing synced note path(s).")
 
                 let folders = snapshot.folders.sorted {
                     $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending
@@ -527,48 +746,46 @@ final class AppModel: ObservableObject {
                     skippedNotesByFolder: snapshot.skippedLockedNotesByFolder
                 )
                 diagnostics.fallbackGroupedDocuments = fallbackDocumentCount
+                AppLog.sync.info(
+                    "Built \(exportGroups.count) export group(s) from \(snapshot.documents.count) document(s); fallbackGroupedDocuments=\(fallbackDocumentCount)."
+                )
+                let (plannedGroups, plannedRelativePathsBySourceIdentifier, migratedLegacyIDs) = planExports(
+                    groups: exportGroups,
+                    indexedRelativePaths: indexedRelativePaths
+                )
+                AppLog.sync.info(
+                    "Planned \(plannedGroups.count) folder export group(s), \(plannedRelativePathsBySourceIdentifier.count) note path mapping(s), migratedLegacyIDs=\(migratedLegacyIDs.count)."
+                )
                 var records: [SyncRecord] = []
-                var migratedLegacyIDs: Set<String> = []
                 var progress = SyncProgress(
                     completedNotes: 0,
                     totalNotes: folders.reduce(0) { $0 + $1.noteCount },
                     completedFolders: 0,
-                    totalFolders: max(exportGroups.count, 1),
+                    totalFolders: max(plannedGroups.count, 1),
                     currentFolderName: nil,
                     skippedNotes: 0
                 )
                 await progressReporter.publish(progress)
 
-                for group in exportGroups {
+                for group in plannedGroups {
                     progress.enterFolder(group.displayName)
                     await progressReporter.publish(progress)
 
-                    for var document in group.documents {
-                        if let legacyID = legacyIdentifier(
-                            for: document.databaseNoteID,
-                            indexedRelativePaths: indexedRelativePaths
-                        ),
-                        document.legacyNoteID == nil,
-                        legacyID != document.id
-                        {
-                            document.legacyNoteID = legacyID
-                            migratedLegacyIDs.insert(legacyID)
-                        }
-
-                        let existingRelativePath = existingRelativePath(
-                            for: document.id,
-                            indexedRelativePaths: indexedRelativePaths
-                        ) ?? document.legacyNoteID.flatMap {
-                            existingRelativePath(for: $0, indexedRelativePaths: indexedRelativePaths)
-                        }
+                    for plannedDocument in group.documents {
                         let exportStart = Date()
-                        let record = try syncEngine.sync(
-                            document: document,
+                        let syncResult = try syncEngine.sync(
+                            document: plannedDocument.document,
                             settings: settings,
-                            existingRelativePath: existingRelativePath
+                            existingRelativePath: plannedDocument.existingRelativePath,
+                            plannedRelativePath: plannedDocument.plannedRelativePath,
+                            plannedRelativePathsBySourceIdentifier: plannedRelativePathsBySourceIdentifier
                         )
                         timings.export += Date().timeIntervalSince(exportStart)
-                        records.append(record)
+                        records.append(syncResult.record)
+                        diagnostics.unresolvedInternalLinks += syncResult.unresolvedInternalLinkCount
+                        AppLog.export.debug(
+                            "Exported note \(plannedDocument.document.id, privacy: .public) to \(syncResult.record.relativePath, privacy: .public); unresolvedInternalLinks=\(syncResult.unresolvedInternalLinkCount)."
+                        )
                         progress.markProcessedNotes()
                         await progressReporter.publish(progress)
                     }
@@ -578,7 +795,7 @@ final class AppModel: ObservableObject {
                     await progressReporter.publish(progress)
                 }
 
-                if exportGroups.isEmpty && !snapshot.documents.isEmpty {
+                if plannedGroups.isEmpty && !snapshot.documents.isEmpty {
                     let folderSummary = folders
                         .map { folder in
                             let folderID = folderDatabaseID(for: folder).map(String.init) ?? "nil"
@@ -599,7 +816,7 @@ final class AppModel: ObservableObject {
 
                 return FullSyncResult(
                     folders: folders,
-                    exportedFolderCount: exportGroups.count,
+                    exportedFolderCount: plannedGroups.count,
                     records: records,
                     timings: timings,
                     diagnostics: diagnostics,
@@ -666,6 +883,7 @@ final class AppModel: ObservableObject {
     }
 
     private func start() {
+        refreshAppleNotesDataAccessStatus()
         notesContextMonitor.start()
         if buildFlavor.supportsInlineEnhancements {
             markdownTriggerEngine.start()
@@ -676,6 +894,35 @@ final class AppModel: ObservableObject {
 
         Task {
             await refreshFolderSummaries()
+        }
+    }
+
+    private func refreshAppleNotesDataAccessStatus() {
+        guard hasAppleNotesDataFolderConfigured else {
+            appleNotesDataAccessStatus = nil
+            return
+        }
+
+        guard let accessSession = resolveAppleNotesDataFolderAccessSession() else {
+            AppLog.access.error("Unable to restore saved Apple Notes data folder access session.")
+            appleNotesDataAccessStatus = AppleNotesDataFolderAccessStatus(
+                level: .invalid,
+                message: "The saved Apple Notes folder access could not be restored. Re-choose the group.com.apple.notes folder."
+            )
+            return
+        }
+        defer {
+            accessSession.stopAccessing()
+        }
+
+        AppLog.access.info(
+            "Inspecting Apple Notes data folder access at \(accessSession.url.path, privacy: .public)"
+        )
+        appleNotesDataAccessStatus = appleNotesSyncDataSource.inspectDataFolder(at: accessSession.url.path)
+        if let appleNotesDataAccessStatus {
+            AppLog.access.info(
+                "Apple Notes data access status: \(appleNotesDataAccessStatus.level.rawValue, privacy: .public) - \(appleNotesDataAccessStatus.message, privacy: .public)"
+            )
         }
     }
 
@@ -719,6 +966,13 @@ final class AppModel: ObservableObject {
         }
     }
 
+    private func resolveAppleNotesDataFolderAccessSession() -> AppleNotesDataFolderAccessSession? {
+        makeAppleNotesDataFolderAccessSession(
+            path: settings.appleNotesDataPath,
+            bookmarkData: settings.appleNotesDataBookmark
+        )
+    }
+
     private func startSyncAnimation() {
         stopSyncAnimation()
         menuBarSyncFrameIndex = 0
@@ -748,10 +1002,13 @@ private struct FullSyncResult {
 }
 
 private enum FullSyncExecutionError: LocalizedError {
+    case emptySnapshot(String)
     case noDocumentsMatchedFolders(String)
 
     var errorDescription: String? {
         switch self {
+        case let .emptySnapshot(details):
+            details
         case let .noDocumentsMatchedFolders(details):
             details
         }
@@ -773,6 +1030,7 @@ private struct SyncTimings: Sendable {
 private struct SyncDiagnostics: Sendable {
     var skippedNotes = 0
     var fallbackGroupedDocuments = 0
+    var unresolvedInternalLinks = 0
     var sourceDiagnostics: String?
 
     var summary: String {
@@ -789,6 +1047,10 @@ private struct SyncDiagnostics: Sendable {
             }
         }
 
+        if unresolvedInternalLinks > 0 {
+            parts.append("Left \(unresolvedInternalLinks) internal note link(s) as plain text because their targets were not exported.")
+        }
+
         return parts.joined(separator: " ")
     }
 }
@@ -796,6 +1058,19 @@ private struct SyncDiagnostics: Sendable {
 private struct FolderExportGroup: Sendable {
     var displayName: String
     var documents: [AppleNotesSyncDocument]
+    var skippedCount: Int
+    var isFallback: Bool
+}
+
+private struct PlannedDocumentExport: Sendable {
+    var document: AppleNotesSyncDocument
+    var existingRelativePath: String?
+    var plannedRelativePath: String
+}
+
+private struct PlannedFolderExportGroup: Sendable {
+    var displayName: String
+    var documents: [PlannedDocumentExport]
     var skippedCount: Int
     var isFallback: Bool
 }

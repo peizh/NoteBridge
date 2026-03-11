@@ -16,6 +16,7 @@ enum SyncDirection: String, Codable, CaseIterable, Identifiable, Sendable {
 struct AppSettings: Codable, Equatable, Sendable {
     var vaultPath: String?
     var appleNotesDataPath: String?
+    var appleNotesDataBookmark: Data?
     var exportFolderName: String
     var attachmentFolderName: String
     var useObsidianAttachmentFolder: Bool
@@ -29,6 +30,7 @@ struct AppSettings: Codable, Equatable, Sendable {
     static let `default` = AppSettings(
         vaultPath: nil,
         appleNotesDataPath: nil,
+        appleNotesDataBookmark: nil,
         exportFolderName: "Apple Notes",
         attachmentFolderName: "_attachments",
         useObsidianAttachmentFolder: false,
@@ -48,6 +50,7 @@ struct AppSettings: Codable, Equatable, Sendable {
     private enum CodingKeys: String, CodingKey {
         case vaultPath
         case appleNotesDataPath
+        case appleNotesDataBookmark
         case exportFolderName
         case attachmentFolderName
         case useObsidianAttachmentFolder
@@ -62,6 +65,7 @@ struct AppSettings: Codable, Equatable, Sendable {
     init(
         vaultPath: String?,
         appleNotesDataPath: String?,
+        appleNotesDataBookmark: Data?,
         exportFolderName: String,
         attachmentFolderName: String,
         useObsidianAttachmentFolder: Bool,
@@ -74,6 +78,7 @@ struct AppSettings: Codable, Equatable, Sendable {
     ) {
         self.vaultPath = vaultPath
         self.appleNotesDataPath = appleNotesDataPath
+        self.appleNotesDataBookmark = appleNotesDataBookmark
         self.exportFolderName = exportFolderName
         self.attachmentFolderName = attachmentFolderName
         self.useObsidianAttachmentFolder = useObsidianAttachmentFolder
@@ -89,6 +94,7 @@ struct AppSettings: Codable, Equatable, Sendable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.vaultPath = try container.decodeIfPresent(String.self, forKey: .vaultPath)
         self.appleNotesDataPath = try container.decodeIfPresent(String.self, forKey: .appleNotesDataPath)
+        self.appleNotesDataBookmark = try container.decodeIfPresent(Data.self, forKey: .appleNotesDataBookmark)
         self.exportFolderName = try container.decodeIfPresent(String.self, forKey: .exportFolderName) ?? Self.default.exportFolderName
         self.attachmentFolderName = try container.decodeIfPresent(String.self, forKey: .attachmentFolderName) ?? Self.default.attachmentFolderName
         self.useObsidianAttachmentFolder = try container.decodeIfPresent(Bool.self, forKey: .useObsidianAttachmentFolder) ?? Self.default.useObsidianAttachmentFolder
@@ -104,6 +110,7 @@ struct AppSettings: Codable, Equatable, Sendable {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encodeIfPresent(vaultPath, forKey: .vaultPath)
         try container.encodeIfPresent(appleNotesDataPath, forKey: .appleNotesDataPath)
+        try container.encodeIfPresent(appleNotesDataBookmark, forKey: .appleNotesDataBookmark)
         try container.encode(exportFolderName, forKey: .exportFolderName)
         try container.encode(attachmentFolderName, forKey: .attachmentFolderName)
         try container.encode(useObsidianAttachmentFolder, forKey: .useObsidianAttachmentFolder)
