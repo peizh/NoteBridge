@@ -71,6 +71,79 @@ struct AppleNotesMarkdownRendererTests {
         #expect(rendered.attachments.first?.preferredFilename == "image.png")
     }
 
+    @Test
+    func convertsAppleNotesTextLinksIntoInternalLinkTokens() throws {
+        let note = makeNote(
+            segments: [
+                segment(
+                    "9/3/2025",
+                    link: "applenotes:note/109a8649-4591-47a2-961d-55352a9c25fe?ownerIdentifier=test"
+                ),
+            ]
+        )
+
+        let rendered = try renderer.render(note: note) { _ in
+            .inlineText("")
+        }
+
+        #expect(rendered.markdownTemplate == "{{note-link:note-link-1}}")
+        #expect(rendered.internalLinks.count == 1)
+        #expect(rendered.internalLinks.first?.displayText == "9/3/2025")
+        #expect(rendered.internalLinks.first?.targetSourceIdentifier == "109A8649-4591-47A2-961D-55352A9C25FE")
+    }
+
+    @Test
+    func convertsAppleNotesXCoreDataLinksIntoInternalLinkTokens() throws {
+        let note = makeNote(
+            segments: [
+                segment(
+                    "Roadmap Q3",
+                    link: "applenotes:note/x-coredata://625E753D-DB29-4635-93F4-C869C2726CCF/ICNote/p5916"
+                ),
+            ]
+        )
+
+        let rendered = try renderer.render(note: note) { _ in
+            .inlineText("")
+        }
+
+        #expect(rendered.markdownTemplate == "{{note-link:note-link-1}}")
+        #expect(rendered.internalLinks.count == 1)
+        #expect(
+            rendered.internalLinks.first?.targetSourceIdentifier
+                == "X-COREDATA://625E753D-DB29-4635-93F4-C869C2726CCF/ICNOTE/P5916"
+        )
+    }
+
+    @Test
+    func collectsInternalLinksReturnedFromAttachmentResolver() throws {
+        let note = makeNote(
+            segments: [
+                AppleNotesTestSegment(
+                    fragment: "\u{FFFC}",
+                    attachmentInfo: AppleNotesDecodedAttachmentInfo(
+                        attachmentIdentifier: "note-link-attachment",
+                        typeUti: "com.apple.notes.inlinetextattachment.link"
+                    )
+                ),
+            ]
+        )
+
+        let rendered = try renderer.render(note: note) { _ in
+            .internalLink(
+                AppleNotesSyncInternalLink(
+                    token: "journal-link",
+                    targetSourceIdentifier: "TARGET-NOTE",
+                    displayText: "9/3/2025"
+                )
+            )
+        }
+
+        #expect(rendered.markdownTemplate == "{{note-link:journal-link}}")
+        #expect(rendered.internalLinks.count == 1)
+        #expect(rendered.internalLinks.first?.displayText == "9/3/2025")
+    }
+
     private func makeNote(segments: [AppleNotesTestSegment]) -> AppleNotesDecodedNote {
         let noteText = segments.map(\.fragment).joined()
         return AppleNotesDecodedNote(

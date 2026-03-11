@@ -1,8 +1,10 @@
 import AppKit
 import Foundation
+import OSLog
 
 protocol AppleNotesSyncDataSourcing: Sendable {
     func validateDataFolder(at path: String) throws -> AppleNotesDataFolderSelection
+    func inspectDataFolder(at path: String) -> AppleNotesDataFolderAccessStatus
     func fetchFolders(fromDataFolder path: String) throws -> [AppleNotesFolder]
     func loadSnapshot(fromDataFolder path: String) throws -> AppleNotesSyncSnapshot
 }
@@ -67,6 +69,17 @@ enum AppleNotesSyncDataSourceError: Equatable, LocalizedError {
     }
 }
 
+enum AppleNotesDataFolderAccessLevel: String, Sendable {
+    case accessible
+    case limited
+    case invalid
+}
+
+struct AppleNotesDataFolderAccessStatus: Sendable {
+    var level: AppleNotesDataFolderAccessLevel
+    var message: String
+}
+
 struct AppleNotesDatabaseSyncSource: AppleNotesSyncDataSourcing {
     private let decoder: AppleNotesNoteProtoDecoder
     private let renderer: AppleNotesMarkdownRenderer
@@ -90,11 +103,83 @@ struct AppleNotesDatabaseSyncSource: AppleNotesSyncDataSourcing {
             throw AppleNotesSyncDataSourceError.unreadableDataFolder
         }
 
-        guard let databaseURL = databaseCandidateURLs(rootURL: rootURL).first else {
+        guard let databaseURL = databaseCandidateReport(rootURL: rootURL).candidateURLs.first else {
             throw AppleNotesSyncDataSourceError.noteStoreNotFound
         }
 
         return AppleNotesDataFolderSelection(rootURL: rootURL, databaseURL: databaseURL)
+    }
+
+    func inspectDataFolder(at path: String) -> AppleNotesDataFolderAccessStatus {
+        let rootURL = URL(fileURLWithPath: path, isDirectory: true).standardizedFileURL
+        guard rootURL.lastPathComponent == "group.com.apple.notes" else {
+            return AppleNotesDataFolderAccessStatus(
+                level: .invalid,
+                message: "Select the Apple Notes group container folder named group.com.apple.notes."
+            )
+        }
+
+        var isDirectory: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: rootURL.path, isDirectory: &isDirectory), isDirectory.boolValue else {
+            return AppleNotesDataFolderAccessStatus(
+                level: .invalid,
+                message: "The configured Apple Notes data folder is unreadable."
+            )
+        }
+
+        let candidateScan = databaseCandidateReport(rootURL: rootURL)
+        guard !candidateScan.candidateURLs.isEmpty else {
+            return AppleNotesDataFolderAccessStatus(
+                level: .invalid,
+                message: "No readable NoteStore.sqlite files were found in the configured Apple Notes data folder."
+            )
+        }
+
+        return resolvedAccessStatus(
+            rootURL: rootURL,
+            candidateScan: candidateScan,
+            candidateReports: inspectionCandidateReports(rootURL: rootURL, candidateScan: candidateScan)
+        )
+    }
+
+    func resolvedAccessStatus(
+        rootURL: URL,
+        candidateScan: AppleNotesDatabaseCandidateScan,
+        candidateReports: [AppleNotesDatabaseCandidateReport]
+    ) -> AppleNotesDataFolderAccessStatus {
+        if let accountsEnumerationError = candidateScan.accountsEnumerationError,
+           !candidateReports.contains(where: \.containsVisibleNotes)
+        {
+            return AppleNotesDataFolderAccessStatus(
+                level: .limited,
+                message: "The Apple Notes root folder is readable, but the Accounts subfolder is not: \(accountsEnumerationError)"
+            )
+        }
+
+        let hasAccountDatabase = candidateScan.candidateURLs.contains {
+            $0.path.contains("/Accounts/")
+        }
+        if candidateScan.rootCandidatePresent && !hasAccountDatabase {
+            let rootDatabasePath = rootURL.appendingPathComponent("NoteStore.sqlite", isDirectory: false).path
+            if let rootCandidateReport = candidateReports.first(where: { $0.databaseURL.path == rootDatabasePath }),
+               rootCandidateReport.containsVisibleNotes
+            {
+                return AppleNotesDataFolderAccessStatus(
+                    level: .accessible,
+                    message: "The root NoteStore.sqlite is readable and already contains your current Apple Notes data. Account databases are not visible, but sync can proceed using the root database."
+                )
+            }
+
+            return AppleNotesDataFolderAccessStatus(
+                level: .limited,
+                message: "Only the root NoteStore.sqlite is currently visible. If sync returns 0 notes, re-choose the Apple Notes data folder to restore access to account databases."
+            )
+        }
+
+        return AppleNotesDataFolderAccessStatus(
+            level: .accessible,
+            message: "The configured Apple Notes data folder is readable."
+        )
     }
 
     func fetchFolders(fromDataFolder path: String) throws -> [AppleNotesFolder] {
@@ -102,7 +187,7 @@ struct AppleNotesDatabaseSyncSource: AppleNotesSyncDataSourcing {
         var bestSummaries: [AppleNotesFolder] = []
         var bestNoteCount = -1
 
-        for candidateURL in databaseCandidateURLs(rootURL: selection.rootURL) {
+        for candidateURL in databaseCandidateReport(rootURL: selection.rootURL).candidateURLs {
             let candidateSelection = AppleNotesDataFolderSelection(
                 rootURL: selection.rootURL,
                 databaseURL: candidateURL
@@ -121,13 +206,15 @@ struct AppleNotesDatabaseSyncSource: AppleNotesSyncDataSourcing {
     }
 
     func loadSnapshot(fromDataFolder path: String) throws -> AppleNotesSyncSnapshot {
+        AppLog.appleNotes.info("Loading Apple Notes snapshot from data folder: \(path, privacy: .public)")
         let selection = try validateDataFolder(at: path)
+        let candidateScan = databaseCandidateReport(rootURL: selection.rootURL)
         var bestSnapshot: AppleNotesSyncSnapshot?
         var bestDocumentCount = -1
         var bestTotalNoteCount = -1
         var candidateReports: [AppleNotesDatabaseCandidateReport] = []
 
-        for candidateURL in databaseCandidateURLs(rootURL: selection.rootURL) {
+        for candidateURL in candidateScan.candidateURLs {
             let candidateSelection = AppleNotesDataFolderSelection(
                 rootURL: selection.rootURL,
                 databaseURL: candidateURL
@@ -140,7 +227,7 @@ struct AppleNotesDatabaseSyncSource: AppleNotesSyncDataSourcing {
                     preferredColumns: ["ztitle1", "ztitle"],
                     prefixes: ["ztitle"]
                 )
-                let noteIdentifierMap = try loadNoteIdentifierMap(
+                let noteReferenceMap = try loadNoteReferenceMap(
                     database: database,
                     schema: schema,
                     noteTitleColumn: noteTitleColumn
@@ -150,7 +237,7 @@ struct AppleNotesDatabaseSyncSource: AppleNotesSyncDataSourcing {
                     schema: schema,
                     selection: candidateSelection,
                     folderContext: folderContext,
-                    noteIdentifierMap: noteIdentifierMap,
+                    noteReferenceMap: noteReferenceMap,
                     noteTitleColumn: noteTitleColumn
                 )
 
@@ -181,6 +268,7 @@ struct AppleNotesDatabaseSyncSource: AppleNotesSyncDataSourcing {
             let documentCount = snapshot.documents.count
             let totalNoteCount = snapshot.folders.reduce(0) { $0 + $1.noteCount }
             candidateReports.append(report)
+            AppLog.appleNotes.debug("Candidate database report: \(report.summary, privacy: .public)")
             if documentCount > bestDocumentCount
                 || (documentCount == bestDocumentCount && totalNoteCount > bestTotalNoteCount)
             {
@@ -196,9 +284,11 @@ struct AppleNotesDatabaseSyncSource: AppleNotesSyncDataSourcing {
 
         let diagnosticsText = makeDiagnosticsText(
             rootURL: selection.rootURL,
-            candidateReports: candidateReports
+            candidateReports: candidateReports,
+            candidateScan: candidateScan
         )
         print(diagnosticsText)
+        AppLog.appleNotes.info("Apple Notes diagnostics: \(diagnosticsText, privacy: .public)")
 
         if bestSnapshot.documents.isEmpty,
            candidateReports.contains(where: { $0.folderCount > 0 || $0.totalNoteCount > 0 })
@@ -208,8 +298,22 @@ struct AppleNotesDatabaseSyncSource: AppleNotesSyncDataSourcing {
             )
         }
 
+        if bestSnapshot.documents.isEmpty,
+           bestSnapshot.folders.isEmpty,
+           candidateScan.candidateURLs.count == 1,
+           candidateScan.rootCandidatePresent
+        {
+            let details = candidateScan.accountsEnumerationError.map { " Accounts scan failed: \($0)" } ?? ""
+            throw AppleNotesSyncDataSourceError.noteBodiesUnavailable(
+                "Apple Notes sync only found an empty root NoteStore.sqlite and could not see the account databases that contain your notes.\(details) Re-choose the Apple Notes data folder in Settings and sync again."
+            )
+        }
+
         var resolvedSnapshot = bestSnapshot
         resolvedSnapshot.sourceDiagnostics = candidateReports.map(\.summary).joined(separator: " | ")
+        AppLog.appleNotes.info(
+            "Resolved Apple Notes snapshot with \(resolvedSnapshot.folders.count) folder(s), \(resolvedSnapshot.documents.count) document(s), \(resolvedSnapshot.skippedLockedNotes) locked note(s)."
+        )
         return resolvedSnapshot
     }
 }
@@ -247,10 +351,71 @@ extension AppleNotesDatabaseSyncSource {
 }
 
 private extension AppleNotesDatabaseSyncSource {
-    func databaseCandidateURLs(rootURL: URL) -> [URL] {
+    func inspectionCandidateReports(
+        rootURL: URL,
+        candidateScan: AppleNotesDatabaseCandidateScan
+    ) -> [AppleNotesDatabaseCandidateReport] {
+        let hasAccountDatabase = candidateScan.candidateURLs.contains { $0.path.contains("/Accounts/") }
+        guard candidateScan.rootCandidatePresent, !hasAccountDatabase else {
+            return []
+        }
+
+        let selection = AppleNotesDataFolderSelection(
+            rootURL: rootURL,
+            databaseURL: rootURL.appendingPathComponent("NoteStore.sqlite", isDirectory: false)
+        )
+
+        do {
+            let report = try withDatabaseSnapshot(from: selection) { database, schema in
+                let folderContext = try loadFolderContext(database: database, schema: schema)
+                let noteTitleColumn = try schema.preferredTextColumn(
+                    database: database,
+                    entityID: try schema.entityID(named: "ICNote"),
+                    preferredColumns: ["ztitle1", "ztitle"],
+                    prefixes: ["ztitle"]
+                )
+                let noteReferenceMap = try loadNoteReferenceMap(
+                    database: database,
+                    schema: schema,
+                    noteTitleColumn: noteTitleColumn
+                )
+                let documentsResult = try loadDocuments(
+                    database: database,
+                    schema: schema,
+                    selection: selection,
+                    folderContext: folderContext,
+                    noteReferenceMap: noteReferenceMap,
+                    noteTitleColumn: noteTitleColumn
+                )
+
+                return AppleNotesDatabaseCandidateReport(
+                    rootURL: rootURL,
+                    databaseURL: selection.databaseURL,
+                    folderCount: folderContext.summaries.count,
+                    totalNoteCount: folderContext.summaries.reduce(0) { $0 + $1.noteCount },
+                    documentCount: documentsResult.documents.count,
+                    skippedLockedNotes: documentsResult.skippedLockedNotes,
+                    folderTitleColumn: folderContext.folderTitleColumn,
+                    noteTitleColumn: noteTitleColumn,
+                    noteFolderColumn: folderContext.noteFolderColumn,
+                    folderReferenceStats: documentsResult.folderReferenceStats
+                )
+            }
+            return [report]
+        } catch {
+            AppLog.appleNotes.error(
+                "Failed to inspect root Apple Notes candidate at \(selection.databaseURL.path, privacy: .public): \(error.localizedDescription, privacy: .public)"
+            )
+            return []
+        }
+    }
+
+    func databaseCandidateReport(rootURL: URL) -> AppleNotesDatabaseCandidateScan {
         var candidates: [URL] = []
+        let fileManager = FileManager.default
         let rootCandidate = rootURL.appendingPathComponent("NoteStore.sqlite", isDirectory: false)
-        if FileManager.default.fileExists(atPath: rootCandidate.path) {
+        let rootCandidatePresent = fileManager.fileExists(atPath: rootCandidate.path)
+        if rootCandidatePresent {
             candidates.append(rootCandidate)
         }
 
@@ -258,39 +423,119 @@ private extension AppleNotesDatabaseSyncSource {
             .appendingPathComponent("Accounts", isDirectory: true)
             .appendingPathComponent("LocalAccount", isDirectory: true)
             .appendingPathComponent("NoteStore.sqlite", isDirectory: false)
-        if FileManager.default.fileExists(atPath: localAccountCandidate.path) {
+        let localAccountCandidatePresent = fileManager.fileExists(atPath: localAccountCandidate.path)
+        if localAccountCandidatePresent {
             candidates.append(localAccountCandidate)
         }
 
         let accountsURL = rootURL.appendingPathComponent("Accounts", isDirectory: true)
-        if let accountDirectories = try? FileManager.default.contentsOfDirectory(
-            at: accountsURL,
-            includingPropertiesForKeys: [.isDirectoryKey],
-            options: [.skipsHiddenFiles]
-        ) {
+        var accountsEnumerationError: String?
+        var accountsIsDirectory = ObjCBool(false)
+        let accountsDirectoryExists = fileManager.fileExists(atPath: accountsURL.path, isDirectory: &accountsIsDirectory)
+        let rootEntries: [String]
+        do {
+            rootEntries = try fileManager.contentsOfDirectory(atPath: rootURL.path).sorted()
+        } catch {
+            AppLog.appleNotes.error(
+                "Failed to enumerate Apple Notes root directory at \(rootURL.path, privacy: .public): \(error.localizedDescription, privacy: .public)"
+            )
+            rootEntries = []
+        }
+        var accountDirectoryNames: [String] = []
+        var accountSubpaths: [String] = []
+        do {
+            let accountDirectories = try fileManager.contentsOfDirectory(
+                at: accountsURL,
+                includingPropertiesForKeys: [.isDirectoryKey, .isHiddenKey],
+                options: []
+            )
+            accountDirectoryNames = accountDirectories.map { accountDirectory in
+                let hiddenFlag = (try? accountDirectory.resourceValues(forKeys: [.isHiddenKey]).isHidden) == true
+                return hiddenFlag ? "\(accountDirectory.lastPathComponent){hidden}" : accountDirectory.lastPathComponent
+            }
+            .sorted()
             for accountDirectory in accountDirectories {
                 let candidate = accountDirectory.appendingPathComponent("NoteStore.sqlite", isDirectory: false)
-                if FileManager.default.fileExists(atPath: candidate.path),
+                if fileManager.fileExists(atPath: candidate.path),
                    !candidates.contains(candidate)
                 {
                     candidates.append(candidate)
                 }
             }
+        } catch {
+            if accountsDirectoryExists {
+                accountsEnumerationError = error.localizedDescription
+                AppLog.appleNotes.error(
+                    "Failed to enumerate Apple Notes Accounts directory at \(accountsURL.path, privacy: .public): \(error.localizedDescription, privacy: .public)"
+                )
+            }
+        }
+        if accountsDirectoryExists {
+            do {
+                accountSubpaths = try fileManager.subpathsOfDirectory(atPath: accountsURL.path)
+                    .sorted()
+            } catch {
+                if accountsEnumerationError == nil {
+                    accountsEnumerationError = error.localizedDescription
+                }
+                AppLog.appleNotes.error(
+                    "Failed to read Apple Notes Accounts subpaths at \(accountsURL.path, privacy: .public): \(error.localizedDescription, privacy: .public)"
+                )
+            }
         }
 
-        return candidates
+        let candidatePaths = candidates.map(\.path).joined(separator: ", ")
+        AppLog.appleNotes.info(
+            """
+            Apple Notes directory scan:
+            root=\(rootURL.path, privacy: .public)
+            rootEntries=\(rootEntries.joined(separator: ","), privacy: .public)
+            rootNoteStoreVisible=\(rootCandidatePresent)
+            localAccountNoteStoreVisible=\(localAccountCandidatePresent)
+            accountsPath=\(accountsURL.path, privacy: .public)
+            accountsExists=\(accountsDirectoryExists)
+            accountsIsDirectory=\(accountsIsDirectory.boolValue)
+            accountsEntries=\(accountDirectoryNames.joined(separator: ","), privacy: .public)
+            accountsSubpaths=\(accountSubpaths.joined(separator: ","), privacy: .public)
+            accountsEnumerationError=\(accountsEnumerationError ?? "none", privacy: .public)
+            """
+        )
+        AppLog.appleNotes.debug(
+            "Candidate database URLs under \(rootURL.path, privacy: .public): \(candidatePaths, privacy: .public)"
+        )
+        return AppleNotesDatabaseCandidateScan(
+            candidateURLs: candidates,
+            rootCandidatePresent: rootCandidatePresent,
+            accountsDirectoryExists: accountsDirectoryExists,
+            accountsIsDirectory: accountsIsDirectory.boolValue,
+            localAccountCandidatePresent: localAccountCandidatePresent,
+            rootEntries: rootEntries,
+            accountDirectoryNames: accountDirectoryNames,
+            accountsEnumerationError: accountsEnumerationError
+        )
     }
 
     func makeDiagnosticsText(
         rootURL: URL,
-        candidateReports: [AppleNotesDatabaseCandidateReport]
+        candidateReports: [AppleNotesDatabaseCandidateReport],
+        candidateScan: AppleNotesDatabaseCandidateScan
     ) -> String {
         let candidateSummary = candidateReports.isEmpty
             ? "No candidate NoteStore.sqlite files found."
             : candidateReports
                 .map(\.summary)
                 .joined(separator: " | ")
-        return "Apple Notes data folder: \(rootURL.path). Candidate databases: \(candidateSummary)"
+        let scanSummary = [
+            "rootEntries=\(candidateScan.rootEntries.joined(separator: ","))",
+            candidateScan.accountsDirectoryExists ? "accountsDir=present" : "accountsDir=missing",
+            "accountsIsDirectory=\(candidateScan.accountsIsDirectory)",
+            "localAccountVisible=\(candidateScan.localAccountCandidatePresent)",
+            candidateScan.accountDirectoryNames.isEmpty ? "accountsEntries=none" : "accountsEntries=\(candidateScan.accountDirectoryNames.joined(separator: ","))",
+            candidateScan.accountsEnumerationError.map { "accountsError=\($0)" },
+        ]
+        .compactMap { $0 }
+        .joined(separator: "; ")
+        return "Apple Notes data folder: \(rootURL.path). Candidate databases: \(candidateSummary)\(scanSummary.isEmpty ? "" : ". \(scanSummary)")"
     }
 
     func withDatabaseSnapshot<T>(
@@ -541,14 +786,15 @@ private extension AppleNotesDatabaseSyncSource {
         return "Untitled Folder"
     }
 
-    func loadNoteIdentifierMap(
+    func loadNoteReferenceMap(
         database: SQLiteDatabase,
         schema: AppleNotesDatabaseSchema,
         noteTitleColumn: String?
-    ) throws -> [String: String] {
+    ) throws -> [String: AppleNotesResolvedNoteReference] {
         let rows = try database.rows(
             """
             SELECT
+                z_pk AS pk,
                 zidentifier AS identifier,
                 \(schema.selectedColumnExpression(noteTitleColumn, alias: "title", defaultValue: "''"))
             FROM ziccloudsyncingobject
@@ -558,13 +804,21 @@ private extension AppleNotesDatabaseSyncSource {
         )
 
         return Dictionary(uniqueKeysWithValues: rows.compactMap { row in
-            guard let identifier = row.string("identifier")?.uppercased(),
-                  let title = row.string("title")
+            guard let identifier = row.string("identifier")
             else {
                 return nil
             }
 
-            return (identifier, title)
+            let normalizedIdentifier = AppleNotesSyncDocument.normalizedSourceIdentifier(identifier)
+            let title = row.string("title")?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            return (
+                normalizedIdentifier,
+                AppleNotesResolvedNoteReference(
+                    databaseNoteID: row.int("pk"),
+                    sourceIdentifier: normalizedIdentifier,
+                    displayText: title.isEmpty ? "Untitled Note" : title
+                )
+            )
         })
     }
 
@@ -573,7 +827,7 @@ private extension AppleNotesDatabaseSyncSource {
         schema: AppleNotesDatabaseSchema,
         selection: AppleNotesDataFolderSelection,
         folderContext: AppleNotesFolderContext,
-        noteIdentifierMap: [String: String],
+        noteReferenceMap: [String: AppleNotesResolvedNoteReference],
         noteTitleColumn: String?
     ) throws -> AppleNotesDocumentLoadResult {
         let noteFolderReferenceColumns = schema.presentColumns(["zfolder", "zcontainer", "zparent"])
@@ -656,13 +910,14 @@ private extension AppleNotesDatabaseSyncSource {
                     schema: schema,
                     selection: selection,
                     ownerID: ownerID,
-                    noteIdentifierMap: noteIdentifierMap
+                    noteReferenceMap: noteReferenceMap
                 )
             }
 
             documents.append(
                 AppleNotesSyncDocument(
                     databaseNoteID: noteID,
+                    sourceNoteIdentifier: row.string("sourceIdentifier"),
                     folderDatabaseID: folderDatabaseID,
                     name: resolvedTitle,
                     folder: folderName,
@@ -676,6 +931,7 @@ private extension AppleNotesDatabaseSyncSource {
                     shared: row.bool("shared"),
                     passwordProtected: false,
                     markdownTemplate: rendered.markdownTemplate,
+                    internalLinks: rendered.internalLinks,
                     attachments: rendered.attachments
                 )
             )
@@ -716,6 +972,7 @@ private extension AppleNotesDatabaseSyncSource {
         var columns = [
             "nd.znote AS pk",
             "nd.zdata AS data",
+            schema.columnExpression("zidentifier", tableAlias: "n", alias: "sourceIdentifier", defaultValue: "''"),
             schema.selectedColumnExpression(noteTitleColumn, tableAlias: "n", alias: "title", defaultValue: "''"),
         ]
         columns.append(contentsOf: noteFolderExpressions)
@@ -753,7 +1010,7 @@ private extension AppleNotesDatabaseSyncSource {
         schema: AppleNotesDatabaseSchema,
         selection: AppleNotesDataFolderSelection,
         ownerID: Int64?,
-        noteIdentifierMap: [String: String]
+        noteReferenceMap: [String: AppleNotesResolvedNoteReference]
     ) throws -> AppleNotesAttachmentResolution {
         switch attachmentInfo.typeUti {
         case AppleNotesInlineAttachmentType.hashtag.rawValue, AppleNotesInlineAttachmentType.mention.rawValue:
@@ -779,12 +1036,18 @@ private extension AppleNotesDatabaseSyncSource {
                 bindings: [.text(attachmentInfo.attachmentIdentifier)]
             )
             guard let token = row?.string("token"),
-                  let identifier = token.appleNotesInternalLinkIdentifier,
-                  let title = noteIdentifierMap[identifier.uppercased()]
+                  let identifier = token.appleNotesInternalLinkIdentifier
             else {
                 return .inlineText("(unknown note link)")
             }
-            return .inlineText("[[\(title)]]")
+            let displayText = noteReferenceMap[identifier]?.displayText ?? "linked note"
+            return .internalLink(
+                AppleNotesSyncInternalLink(
+                    token: attachmentInfo.attachmentIdentifier,
+                    targetSourceIdentifier: identifier,
+                    displayText: displayText
+                )
+            )
 
         case AppleNotesInlineAttachmentType.urlCard.rawValue:
             let row = try database.row(
@@ -1304,13 +1567,30 @@ private struct AppleNotesDocumentLoadResult {
     var folderReferenceStats: [AppleNotesFolderReferenceStat]
 }
 
-private struct AppleNotesFolderReferenceStat {
+struct AppleNotesFolderReferenceStat {
     var columnName: String
     var nonNullCount: Int
     var matchedFolderCount: Int
 }
 
-private struct AppleNotesDatabaseCandidateReport {
+struct AppleNotesDatabaseCandidateScan {
+    var candidateURLs: [URL]
+    var rootCandidatePresent: Bool
+    var accountsDirectoryExists: Bool
+    var accountsIsDirectory: Bool
+    var localAccountCandidatePresent: Bool
+    var rootEntries: [String]
+    var accountDirectoryNames: [String]
+    var accountsEnumerationError: String?
+}
+
+private struct AppleNotesResolvedNoteReference {
+    var databaseNoteID: Int64?
+    var sourceIdentifier: String
+    var displayText: String
+}
+
+struct AppleNotesDatabaseCandidateReport {
     var rootURL: URL
     var databaseURL: URL
     var folderCount: Int
@@ -1331,6 +1611,10 @@ private struct AppleNotesDatabaseCandidateReport {
                 .joined(separator: ";")
         return "\(relativePath) [folders=\(folderCount), notes=\(totalNoteCount), docs=\(documentCount), locked=\(skippedLockedNotes), folderTitle=\(folderTitleColumn ?? "nil"), noteTitle=\(noteTitleColumn ?? "nil"), noteFolder=\(noteFolderColumn ?? "nil"), refs=\(referenceSummary)]"
     }
+
+    var containsVisibleNotes: Bool {
+        documentCount > 0 || totalNoteCount > 0 || folderCount > 0
+    }
 }
 
 private enum AppleNotesFolderType: Int {
@@ -1350,20 +1634,4 @@ private enum AppleNotesInlineAttachmentType: String {
     case drawingLegacy = "com.apple.drawing"
     case drawingLegacy2 = "com.apple.drawing.2"
     case urlCard = "public.url"
-}
-
-private extension String {
-    var appleNotesInternalLinkIdentifier: String? {
-        let pattern = #"applenotes:note/([-0-9a-fA-F]+)"#
-        guard let regex = try? NSRegularExpression(pattern: pattern) else {
-            return nil
-        }
-        let range = NSRange(startIndex..., in: self)
-        guard let match = regex.firstMatch(in: self, range: range),
-              let tokenRange = Range(match.range(at: 1), in: self)
-        else {
-            return nil
-        }
-        return String(self[tokenRange])
-    }
 }

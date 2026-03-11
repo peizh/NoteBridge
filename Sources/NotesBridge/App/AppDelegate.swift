@@ -15,6 +15,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         } else {
             NSApp.setActivationPolicy(.accessory)
             scheduleInputMonitoringRequestIfNeeded()
+            scheduleDebugSyncIfNeeded()
         }
     }
 
@@ -52,6 +53,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             AppRuntime.shared.appModel.requestInputMonitoringPermission()
+        }
+    }
+
+    private func scheduleDebugSyncIfNeeded() {
+        guard ProcessInfo.processInfo.environment["NOTESBRIDGE_DEBUG_SYNC_ON_LAUNCH"] == "1" else {
+            return
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.75) {
+            Task {
+                await AppRuntime.shared.appModel.syncAllNotes()
+            }
         }
     }
 }

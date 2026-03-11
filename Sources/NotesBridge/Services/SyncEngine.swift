@@ -4,8 +4,15 @@ protocol Syncing: Sendable {
     func sync(
         document: AppleNotesSyncDocument,
         settings: AppSettings,
-        existingRelativePath: String?
-    ) throws -> SyncRecord
+        existingRelativePath: String?,
+        plannedRelativePath: String,
+        plannedRelativePathsBySourceIdentifier: [String: String]
+    ) throws -> NoteSyncResult
+}
+
+struct NoteSyncResult: Sendable {
+    let record: SyncRecord
+    let unresolvedInternalLinkCount: Int
 }
 
 struct SyncEngine: Syncing {
@@ -18,18 +25,25 @@ struct SyncEngine: Syncing {
     func sync(
         document: AppleNotesSyncDocument,
         settings: AppSettings,
-        existingRelativePath: String?
-    ) throws -> SyncRecord {
+        existingRelativePath: String?,
+        plannedRelativePath: String,
+        plannedRelativePathsBySourceIdentifier: [String: String]
+    ) throws -> NoteSyncResult {
         let export = try vaultClient.export(
             note: document,
             settings: settings,
-            existingRelativePath: existingRelativePath
+            existingRelativePath: existingRelativePath,
+            plannedRelativePath: plannedRelativePath,
+            plannedRelativePathsBySourceIdentifier: plannedRelativePathsBySourceIdentifier
         )
-        return SyncRecord(
-            noteID: document.id,
-            relativePath: export.relativePath,
-            lastSyncedAt: Date(),
-            sourceUpdatedAt: document.updatedAt
+        return NoteSyncResult(
+            record: SyncRecord(
+                noteID: document.id,
+                relativePath: export.relativePath,
+                lastSyncedAt: Date(),
+                sourceUpdatedAt: document.updatedAt
+            ),
+            unresolvedInternalLinkCount: export.unresolvedInternalLinkCount
         )
     }
 }

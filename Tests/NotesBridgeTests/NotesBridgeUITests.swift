@@ -68,6 +68,15 @@ final class NotesBridgeUITests: XCTestCase {
                 atPath: vaultURL.appendingPathComponent("Apple Notes/Projects/Specs/Roadmap.md").path
             )
         )
+
+        let firstNoteContents = try String(
+            contentsOf: vaultURL.appendingPathComponent("Apple Notes/Inbox/First Note.md"),
+            encoding: .utf8
+        )
+        XCTAssertTrue(
+            firstNoteContents.contains("[[Apple Notes/Projects/Specs/Roadmap|Roadmap]]"),
+            firstNoteContents
+        )
     }
 
     private func notesBridgeBinaryURL() throws -> URL {

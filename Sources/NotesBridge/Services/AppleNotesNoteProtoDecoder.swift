@@ -35,11 +35,13 @@ struct AppleNotesDecodedAttachmentInfo: Sendable {
 
 enum AppleNotesAttachmentResolution: Sendable {
     case inlineText(String)
+    case internalLink(AppleNotesSyncInternalLink)
     case attachment(AppleNotesSyncAttachment, isBlock: Bool)
 }
 
 struct AppleNotesRenderedNote: Sendable {
     var markdownTemplate: String
+    var internalLinks: [AppleNotesSyncInternalLink]
     var attachments: [AppleNotesSyncAttachment]
 }
 
@@ -311,6 +313,7 @@ struct AppleNotesMarkdownRenderer {
         state.finish()
         return AppleNotesRenderedNote(
             markdownTemplate: state.output.trimmingCharacters(in: .whitespacesAndNewlines),
+            internalLinks: state.internalLinks,
             attachments: state.attachments
         )
     }
@@ -319,6 +322,7 @@ struct AppleNotesMarkdownRenderer {
 private extension AppleNotesMarkdownRenderer {
     struct RenderState {
         var output = ""
+        var internalLinks: [AppleNotesSyncInternalLink] = []
         var attachments: [AppleNotesSyncAttachment] = []
         var isAtLineStart = true
         var listNumber = 0
@@ -356,7 +360,15 @@ private extension AppleNotesMarkdownRenderer {
                     output.append(paragraphPrefix(for: run))
                 }
 
-                output.append(formattedText(segment, run: run))
+                if let targetSourceIdentifier = run.link?.appleNotesInternalLinkIdentifier {
+                    let placeholder = appendInternalLink(
+                        displayText: segment,
+                        targetSourceIdentifier: targetSourceIdentifier
+                    )
+                    output.append(placeholder)
+                } else {
+                    output.append(formattedText(segment, run: run))
+                }
                 isAtLineStart = false
             }
         }
@@ -384,6 +396,14 @@ private extension AppleNotesMarkdownRenderer {
                 output.append(text)
                 isAtLineStart = false
 
+            case let .internalLink(link):
+                if isAtLineStart && !insideMonospacedBlock {
+                    output.append(paragraphPrefix(for: run))
+                }
+                let placeholder = appendInternalLink(link)
+                output.append(placeholder)
+                isAtLineStart = false
+
             case let .attachment(attachment, isBlock):
                 attachments.append(attachment)
                 let token = "{{attachment:\(attachment.token)}}"
@@ -408,6 +428,26 @@ private extension AppleNotesMarkdownRenderer {
                     isAtLineStart = false
                 }
             }
+        }
+
+        private mutating func appendInternalLink(_ link: AppleNotesSyncInternalLink) -> String {
+            internalLinks.append(link)
+            return "{{note-link:\(link.token)}}"
+        }
+
+        private mutating func appendInternalLink(
+            displayText: String,
+            targetSourceIdentifier: String
+        ) -> String {
+            let token = "note-link-\(internalLinks.count + 1)"
+            let trimmedDisplayText = displayText.trimmingCharacters(in: .whitespacesAndNewlines)
+            return appendInternalLink(
+                AppleNotesSyncInternalLink(
+                    token: token,
+                    targetSourceIdentifier: targetSourceIdentifier,
+                    displayText: trimmedDisplayText.isEmpty ? "linked note" : trimmedDisplayText
+                )
+            )
         }
 
         private mutating func transitionMonospacedBlock(for styleType: Int) {
@@ -488,11 +528,7 @@ private extension AppleNotesMarkdownRenderer {
             }
 
             if let link = run.link, link != fragment {
-                if link.lowercased().hasPrefix("applenotes:note/") {
-                    formatted = "[\(formatted)](\(link))"
-                } else {
-                    formatted = "[\(formatted)](\(link))"
-                }
+                formatted = "[\(formatted)](\(link))"
             }
 
             return formatted
