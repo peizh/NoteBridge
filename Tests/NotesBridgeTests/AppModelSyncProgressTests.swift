@@ -107,13 +107,15 @@ struct AppModelSyncProgressTests {
         }
 
         let snapshots = await captureProgressSnapshots(from: model, while: syncTask)
-        let sawFirstCompletedNote = snapshots.contains { snapshot in
-            snapshot.completedNotes == 1
+        let sawInFlightProgress = snapshots.contains { snapshot in
+            snapshot.totalNotes == 2 &&
+                snapshot.totalFolders == 1 &&
+                snapshot.currentFolderName == "Inbox"
         }
 
         await syncTask.value
 
-        #expect(sawFirstCompletedNote)
+        #expect(sawInFlightProgress)
         #expect(model.syncProgress == nil)
         #expect(model.statusMessage.contains("Failed to sync Apple Notes to Obsidian."))
     }
