@@ -6,18 +6,40 @@ import Foundation
 final class FormattingCommandExecutor {
     private let notesBundleIdentifier = "com.apple.Notes"
     private let deleteKeyCode: CGKeyCode = 51
+    private let runner: ProcessRunner
+
+    init(runner: ProcessRunner = ProcessRunner()) {
+        self.runner = runner
+    }
 
     func perform(_ command: FormattingCommand) {
-        guard isAppleNotesFrontmost else { return }
-        postShortcut(command.shortcut)
+        Task {
+            await performAsync(command)
+        }
+    }
+
+    func performAsync(_ command: FormattingCommand) async {
+        guard isAppleNotesFrontmost,
+              let notesPID = appleNotesProcessID
+        else {
+            return
+        }
+        if await performViaMenuItem(command) {
+            return
+        }
+        postShortcut(command.shortcut, to: notesPID)
     }
 
     func applyMarkdownTrigger(literalLength: Int, command: FormattingCommand) async {
-        guard isAppleNotesFrontmost else { return }
+        guard isAppleNotesFrontmost,
+              let notesPID = appleNotesProcessID
+        else {
+            return
+        }
 
-        deleteBackward(count: literalLength)
+        deleteBackward(count: literalLength, to: notesPID)
         try? await Task.sleep(for: .milliseconds(45))
-        perform(command)
+        await performAsync(command)
     }
 
     func applySlashCommand(replacementRange: NSRange, command: FormattingCommand, in context: EditingContext) async {
@@ -25,23 +47,104 @@ final class FormattingCommandExecutor {
         guard replaceText(in: context.element, range: replacementRange, with: "") else { return }
 
         try? await Task.sleep(for: .milliseconds(45))
-        perform(command)
+        await performAsync(command)
+    }
+
+    func forwardKeyEventToAppleNotes(_ event: NSEvent) {
+        guard let notesPID = appleNotesProcessID,
+              let keyDown = event.cgEvent?.copy(),
+              let keyUp = keyDown.copy()
+        else {
+            return
+        }
+
+        keyDown.setIntegerValueField(.eventSourceUserData, value: 0)
+        keyUp.setIntegerValueField(.eventSourceUserData, value: 0)
+        keyUp.type = .keyUp
+        keyUp.flags = keyDown.flags
+        keyDown.postToPid(notesPID)
+        keyUp.postToPid(notesPID)
     }
 
     private var isAppleNotesFrontmost: Bool {
         NSWorkspace.shared.frontmostApplication?.bundleIdentifier == notesBundleIdentifier
     }
 
-    private func deleteBackward(count: Int) {
-        guard count > 0 else { return }
+    private var appleNotesProcessID: pid_t? {
+        NSRunningApplication.runningApplications(withBundleIdentifier: notesBundleIdentifier).first?.processIdentifier
+    }
 
-        for _ in 0 ..< count {
-            postKey(keyCode: deleteKeyCode, modifiers: [])
+    private func performViaMenuItem(_ command: FormattingCommand) async -> Bool {
+        guard let invocation = menuInvocation(for: command) else {
+            return false
+        }
+
+        let script = """
+        tell application "System Events"
+          tell process "Notes"
+            click menu item \(appleScriptStringLiteral(invocation.menuItem)) of menu 1 of menu bar item \(appleScriptStringLiteral(invocation.menuBarItem)) of menu bar 1
+          end tell
+        end tell
+        """
+
+        return await Task.detached(priority: .userInitiated) { [runner] in
+            do {
+                _ = try runner.run(executable: "/usr/bin/osascript", arguments: ["-e", script])
+                return true
+            } catch {
+                return false
+            }
+        }.value
+    }
+
+    private func menuInvocation(for command: FormattingCommand) -> (menuBarItem: String, menuItem: String)? {
+        switch command {
+        case .title:
+            ("Format", "Title")
+        case .heading:
+            ("Format", "Heading")
+        case .subheading:
+            ("Format", "Subheading")
+        case .body:
+            ("Format", "Body")
+        case .checklist:
+            ("Format", "Checklist")
+        case .bulletedList:
+            ("Format", "Bulleted List")
+        case .dashedList:
+            ("Format", "Dashed List")
+        case .numberedList:
+            ("Format", "Numbered List")
+        case .quote:
+            ("Format", "Block Quote")
+        case .monostyled:
+            ("Format", "Monostyled")
+        case .table:
+            ("Format", "Table")
+        case .insertLink:
+            ("Edit", "Add Link…")
+        case .bold:
+            nil
         }
     }
 
-    private func postShortcut(_ shortcut: KeyboardShortcutSpec) {
-        postKey(keyCode: shortcut.keyCode, modifiers: shortcut.modifiers)
+    private func appleScriptStringLiteral(_ value: String) -> String {
+        let escaped = value
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
+        return "\"\(escaped)\""
+    }
+
+    private func deleteBackward(count: Int, to pid: pid_t) {
+        guard count > 0 else { return }
+
+        for _ in 0 ..< count {
+            postKey(keyCode: deleteKeyCode, modifiers: [], to: pid)
+        }
+    }
+
+    private func postShortcut(_ shortcut: KeyboardShortcutSpec, to pid: pid_t) {
+        postKey(keyCode: shortcut.keyCode, modifiers: shortcut.modifiers, to: pid)
     }
 
     private func replaceText(in element: AXUIElement, range: NSRange, with replacement: String) -> Bool {
@@ -84,7 +187,7 @@ final class FormattingCommandExecutor {
         ) == .success
     }
 
-    private func postKey(keyCode: CGKeyCode, modifiers: CGEventFlags) {
+    private func postKey(keyCode: CGKeyCode, modifiers: CGEventFlags, to pid: pid_t) {
         guard let source = CGEventSource(stateID: .combinedSessionState),
               let keyDown = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: true),
               let keyUp = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: false)
@@ -94,7 +197,7 @@ final class FormattingCommandExecutor {
 
         keyDown.flags = modifiers
         keyUp.flags = modifiers
-        keyDown.post(tap: .cghidEventTap)
-        keyUp.post(tap: .cghidEventTap)
+        keyDown.postToPid(pid)
+        keyUp.postToPid(pid)
     }
 }
