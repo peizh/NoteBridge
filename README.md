@@ -9,13 +9,38 @@
 
 ![NotesBridge social banner](./images/notesbridge-social.svg)
 
-NotesBridge is a native macOS companion for Apple Notes. It runs as a menu bar app, adds inline editing enhancements on top of Apple Notes, and exports notes into an Obsidian vault.
+NotesBridge is a native macOS companion for Apple Notes. It runs as a menu bar app, adds inline editing enhancements on top of Apple Notes, and exports notes into local Markdown files and folders you can keep, search, version, and use with AI agents.
 
 ## Project status
 
-NotesBridge is under active development. The direct-download macOS build is the primary experience, and Apple Notes integration currently depends on local macOS permissions and direct access to the Apple Notes data container.
+NotesBridge is an actively developed macOS companion app for people who receive or organize notes in Apple Notes, but want the long-term source of truth to live as local Markdown files and folders.
 
-## What this prototype does
+The current direct-download build focuses on two jobs:
+
+- add inline Apple Notes editing tools such as slash commands and markdown-style triggers
+- sync Apple Notes into a local-first Obsidian-style vault with folders, attachments, front matter, and internal links preserved
+
+Apple Notes is great for easy editing on the Phone or shared notes with family and friends. NotesBridge turns that shared input into a Markdown workspace that is easier to organize, automate, version, and collaborate on with AI agents.
+
+If you already use Apple Notes for capture and Obsidian or other local first note apps for long-term organization, NotesBridge is built for that workflow.
+
+## Why try it
+
+- Use slash commands and inline formatting tools directly on top of Apple Notes.
+- Run as a lightweight menu bar app instead of replacing your note-taking workflow.
+- Preserve Apple Notes structure as real Markdown files and folders.
+- Keep native attachments, scan exports, tables, and internal note links.
+- Make synced notes easier to search, version, and process with AI agents.
+
+## Quick start
+
+1. Download the latest direct-download build from [Releases](https://github.com/peizh/NoteBridge/releases).
+2. Move `NotesBridge.app` into `/Applications`.
+3. Launch the app and grant the requested macOS permissions.
+4. Choose your Apple Notes data folder on first full sync.
+5. Start syncing into your Obsidian vault.
+
+## What it does today
 
 - Runs as a menu bar companion with a lightweight settings window.
 - Watches Apple Notes when it is frontmost and the editor is focused.
@@ -102,9 +127,9 @@ The final direct-download artifact is produced in `./dist/` and can be uploaded 
 
 ## Suggested next steps
 
-1. Harden selection anchoring and formatting-bar placement across multiple displays and fullscreen spaces.
-2. Add a richer sync index and incremental note change tracking.
-3. Package separate direct-download and App Store deliverables from the same codebase.
+1. Harden selection anchoring, slash menu placement, and formatting-bar placement across multiple displays and fullscreen spaces.
+2. Add a richer sync index and incremental note change tracking so full vault exports do less unnecessary work.
+3. Ship a fully signed and notarized direct-download release pipeline, then decide whether a real App Store deliverable is worth maintaining separately.
 
 ## License
 

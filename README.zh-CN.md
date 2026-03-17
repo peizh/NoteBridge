@@ -11,11 +11,36 @@
 
 > 该文档可能会略晚于英文版更新。
 
-NotesBridge 是一个面向 Apple Notes 的原生 macOS 伴侣应用。它以菜单栏应用的形式运行，为 Apple Notes 增加行内编辑增强能力，并将笔记导出到 Obsidian 仓库。
+把共享的 Apple Notes 转成本地 Markdown 文件和文件夹，方便长期保存、搜索、版本管理，并交给 AI agents 使用。
 
 ## 项目状态
 
-NotesBridge 仍在持续开发中。当前以直装版 macOS 构建为主要体验形态；Apple Notes 集成依赖本地 macOS 权限以及对 Apple Notes 数据容器的直接访问。
+NotesBridge 仍在持续开发中。它是一个面向 macOS 的伴侣应用，适合那些在 Apple Notes 中接收、整理笔记，但希望长期知识资产以本地 Markdown 文件和文件夹形式保存的人。
+
+当前直装版主要聚焦两件事：
+
+- 在 Apple Notes 里提供 slash commands 和 markdown-style 行内编辑增强
+- 把 Apple Notes 同步成具备文件夹、附件、front matter 和内部链接的本地优先 Markdown 仓库
+
+Apple Notes 很适合承接家人和朋友共享过来的内容。NotesBridge 的作用，是把这些共享输入沉淀为更适合组织、自动化、版本管理、并与 AI agents 协作的 Markdown 工作区。
+
+如果你已经在用 Apple Notes 做捕获、用 Obsidian 做长期整理，NotesBridge 就是为这种工作流准备的。
+
+## 为什么值得试
+
+- 把 Apple Notes 结构保留下来，变成真实的 Markdown 文件和文件夹。
+- 保留原生附件、扫描件导出、表格和内部笔记链接。
+- 让同步后的内容更适合搜索、版本管理和 AI agents 处理。
+- 直接在 Apple Notes 上叠加 slash commands 和行内格式化工具。
+- 以轻量菜单栏应用方式工作，而不是强行替换你的笔记流程。
+
+## 快速开始
+
+1. 从 [Releases](https://github.com/peizh/NoteBridge/releases) 下载最新直装版。
+2. 将 `NotesBridge.app` 拖到 `/Applications`。
+3. 启动应用并授予需要的 macOS 权限。
+4. 第一次全量同步时选择 Apple Notes 数据目录。
+5. 开始把 Apple Notes 同步到你的 Obsidian 仓库。
 
 ## 当前原型支持
 
@@ -66,9 +91,9 @@ swift run
 
 ## 建议的下一步
 
-1. 强化多显示器与全屏空间下的选区锚点和格式工具条定位。
-2. 增加更丰富的同步索引和增量笔记变更跟踪能力。
-3. 从同一代码库中打包直装版与 App Store 版两个交付物。
+1. 强化多显示器与全屏空间下的选区锚点、slash 菜单定位以及格式工具条定位。
+2. 增加更丰富的同步索引和增量笔记变更跟踪能力，减少全量导出中的重复工作。
+3. 完成正式的签名与 notarization 直装版发布链路，再决定是否值得单独长期维护真正的 App Store 交付物。
 
 ## License
 
