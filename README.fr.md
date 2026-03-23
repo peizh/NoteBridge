@@ -11,13 +11,13 @@
 
 NotesBridge est une application compagnon native macOS pour Apple Notes. Elle fonctionne comme une app de barre de menus, ajoute des améliorations d'édition en ligne au-dessus d'Apple Notes et exporte les notes vers des fichiers et dossiers Markdown locaux que vous pouvez conserver, rechercher, versionner et utiliser avec des agents IA.
 
-## État du projet
+## Statut
 
 NotesBridge est une application compagnon macOS en développement actif, destinée aux personnes qui reçoivent ou organisent des notes dans Apple Notes, mais qui veulent conserver une version de référence fiable à long terme dans des fichiers et dossiers Markdown locaux.
 
-La version en téléchargement direct se concentre actuellement sur deux objectifs :
+La version actuelle se concentre sur deux objectifs :
 
-- ajouter des outils d'édition en ligne dans Apple Notes, comme les slash commands et les déclencheurs de style Markdown
+- améliorer l'expérience d'édition de la version macOS d'Apple Notes avec des outils en ligne enrichis, comme les slash commands et les déclencheurs de style Markdown
 - synchroniser Apple Notes vers des dossiers locaux de style Obsidian, en préservant la structure des dossiers, les pièces jointes, le front matter, les liens internes et les autres éléments associés
 
 Apple Notes est très pratique pour l'édition simple sur téléphone ou pour les notes partagées avec la famille et les amis. NotesBridge transforme cette matière partagée en un espace de travail Markdown plus simple à organiser, automatiser, versionner et faire exploiter par des agents IA.
