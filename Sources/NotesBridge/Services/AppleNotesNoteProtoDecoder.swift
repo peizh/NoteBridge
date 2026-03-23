@@ -363,16 +363,16 @@ private extension AppleNotesMarkdownRenderer {
             guard !paragraphRuns.isEmpty else { return }
 
             let paragraphStyle = paragraphRuns.lazy.compactMap(\.run.paragraphStyle).first
-            if let paragraphStyle {
-                for var renderRun in paragraphRuns {
-                    if renderRun.run.paragraphStyle == nil {
-                        renderRun.run.paragraphStyle = paragraphStyle
-                    }
-                    normalizedRuns.append(renderRun)
+            let resolvedParagraphRuns = paragraphRuns.map { renderRun -> NormalizedRenderRun in
+                guard let paragraphStyle, renderRun.run.paragraphStyle == nil else {
+                    return renderRun
                 }
-            } else {
-                normalizedRuns.append(contentsOf: paragraphRuns)
+
+                var resolvedRun = renderRun
+                resolvedRun.run.paragraphStyle = paragraphStyle
+                return resolvedRun
             }
+            normalizedRuns.append(contentsOf: mergeAdjacentEquivalentRuns(resolvedParagraphRuns))
 
             paragraphRuns.removeAll(keepingCapacity: true)
         }
@@ -394,6 +394,50 @@ private extension AppleNotesMarkdownRenderer {
 
         flushParagraphRuns()
         return normalizedRuns
+    }
+
+    func mergeAdjacentEquivalentRuns(_ runs: [NormalizedRenderRun]) -> [NormalizedRenderRun] {
+        guard !runs.isEmpty else { return [] }
+
+        var mergedRuns: [NormalizedRenderRun] = [runs[0]]
+        for run in runs.dropFirst() {
+            if let last = mergedRuns.last, canMerge(last, with: run) {
+                mergedRuns[mergedRuns.count - 1].fragment += run.fragment
+                mergedRuns[mergedRuns.count - 1].run.length += run.run.length
+            } else {
+                mergedRuns.append(run)
+            }
+        }
+
+        return mergedRuns
+    }
+
+    func canMerge(_ lhs: NormalizedRenderRun, with rhs: NormalizedRenderRun) -> Bool {
+        paragraphStylesEqual(lhs.run.paragraphStyle, rhs.run.paragraphStyle)
+            && lhs.run.fontWeight == rhs.run.fontWeight
+            && lhs.run.underlined == rhs.run.underlined
+            && lhs.run.strikethrough == rhs.run.strikethrough
+            && lhs.run.superscript == rhs.run.superscript
+            && lhs.run.link == rhs.run.link
+            && attachmentInfosEqual(lhs.run.attachmentInfo, rhs.run.attachmentInfo)
+    }
+
+    func paragraphStylesEqual(
+        _ lhs: AppleNotesDecodedParagraphStyle?,
+        _ rhs: AppleNotesDecodedParagraphStyle?
+    ) -> Bool {
+        lhs?.styleType == rhs?.styleType
+            && lhs?.indentAmount == rhs?.indentAmount
+            && lhs?.blockquote == rhs?.blockquote
+            && lhs?.checklist?.done == rhs?.checklist?.done
+    }
+
+    func attachmentInfosEqual(
+        _ lhs: AppleNotesDecodedAttachmentInfo?,
+        _ rhs: AppleNotesDecodedAttachmentInfo?
+    ) -> Bool {
+        lhs?.attachmentIdentifier == rhs?.attachmentIdentifier
+            && lhs?.typeUti == rhs?.typeUti
     }
 
     struct RenderState {
