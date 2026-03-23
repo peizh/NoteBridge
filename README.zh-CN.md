@@ -11,13 +11,13 @@
 
 NotesBridge 是一个面向 Apple Notes 的原生 macOS 伴侣应用。它以菜单栏应用的形式运行，在 Apple Notes 之上提供行内编辑增强能力，并将笔记导出为可保存、搜索、版本管理、并可与 AI agents 协作的本地 Markdown 文件和文件夹。
 
-## 项目状态
+## 状态
 
 NotesBridge 是一个仍在积极开发中的 macOS 伴侣应用，适合那些在 Apple Notes 中接收或整理笔记，但希望将长期可信版本保存在本地 Markdown 文件和文件夹中的用户。
 
-当前直装版主要聚焦于两项工作：
+当前版本主要聚焦于两项工作：
 
-- 增加 Apple Notes 行内编辑工具，例如 slash commands 和 markdown-style 触发器
+- 增加 Apple Notes macOS 版本的编辑体验，提供增强行内编辑工具，例如 slash commands 和 markdown-style 触发器
 - 将 Apple Notes 同步到本地优先、类似 Obsidian 仓库的本地文件夹中，并保留文件夹结构、附件、front matter 和内部链接等元素
 
 Apple Notes 很适合在手机上轻松编辑，也适合与家人和朋友共享笔记。NotesBridge 会把这些共享输入转化为一个更便于组织、自动化、版本管理以及与 AI agents 协作的 Markdown 工作区。
