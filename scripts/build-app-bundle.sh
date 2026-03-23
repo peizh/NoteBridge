@@ -177,7 +177,6 @@ codesign_support_frameworks() {
 }
 
 echo "Building NotesBridge ($BUILD_CONFIG)..."
-swift build --package-path "$ROOT_DIR" -c "$BUILD_CONFIG"
 BUILD_BIN_PATH="$(swift build --package-path "$ROOT_DIR" -c "$BUILD_CONFIG" --show-bin-path)"
 EXECUTABLE_PATH="$BUILD_BIN_PATH/NotesBridge"
 SPARKLE_FRAMEWORK_SOURCE="$BUILD_BIN_PATH/Sparkle.framework"
