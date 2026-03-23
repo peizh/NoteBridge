@@ -120,6 +120,131 @@ struct AppleNotesMarkdownRendererTests {
     }
 
     @Test
+    func mergesAdjacentMailtoAndStrikethroughRunsBeforeMarkdownFormatting() throws {
+        let note = AppleNotesDecodedNote(
+            noteText: "alternative email: p@peizh.live\njgznkr1rmep",
+            attributeRuns: [
+                AppleNotesDecodedAttributeRun(
+                    length: ("alternative email: " as NSString).length,
+                    paragraphStyle: nil,
+                    fontWeight: nil,
+                    underlined: false,
+                    strikethrough: false,
+                    superscript: nil,
+                    link: nil,
+                    attachmentInfo: nil
+                ),
+                AppleNotesDecodedAttributeRun(
+                    length: ("p@" as NSString).length,
+                    paragraphStyle: nil,
+                    fontWeight: nil,
+                    underlined: false,
+                    strikethrough: false,
+                    superscript: nil,
+                    link: "mailto:p@peizh.live",
+                    attachmentInfo: nil
+                ),
+                AppleNotesDecodedAttributeRun(
+                    length: ("p" as NSString).length,
+                    paragraphStyle: nil,
+                    fontWeight: nil,
+                    underlined: false,
+                    strikethrough: false,
+                    superscript: nil,
+                    link: "mailto:p@peizh.live",
+                    attachmentInfo: nil
+                ),
+                AppleNotesDecodedAttributeRun(
+                    length: ("ei" as NSString).length,
+                    paragraphStyle: nil,
+                    fontWeight: nil,
+                    underlined: false,
+                    strikethrough: false,
+                    superscript: nil,
+                    link: "mailto:p@peizh.live",
+                    attachmentInfo: nil
+                ),
+                AppleNotesDecodedAttributeRun(
+                    length: ("zh" as NSString).length,
+                    paragraphStyle: nil,
+                    fontWeight: nil,
+                    underlined: false,
+                    strikethrough: false,
+                    superscript: nil,
+                    link: "mailto:p@peizh.live",
+                    attachmentInfo: nil
+                ),
+                AppleNotesDecodedAttributeRun(
+                    length: ("." as NSString).length,
+                    paragraphStyle: nil,
+                    fontWeight: nil,
+                    underlined: false,
+                    strikethrough: false,
+                    superscript: nil,
+                    link: "mailto:p@peizh.live",
+                    attachmentInfo: nil
+                ),
+                AppleNotesDecodedAttributeRun(
+                    length: ("live" as NSString).length,
+                    paragraphStyle: nil,
+                    fontWeight: nil,
+                    underlined: false,
+                    strikethrough: false,
+                    superscript: nil,
+                    link: "mailto:p@peizh.live",
+                    attachmentInfo: nil
+                ),
+                AppleNotesDecodedAttributeRun(
+                    length: ("\n" as NSString).length,
+                    paragraphStyle: nil,
+                    fontWeight: nil,
+                    underlined: false,
+                    strikethrough: false,
+                    superscript: nil,
+                    link: nil,
+                    attachmentInfo: nil
+                ),
+                AppleNotesDecodedAttributeRun(
+                    length: ("jgzn" as NSString).length,
+                    paragraphStyle: nil,
+                    fontWeight: nil,
+                    underlined: false,
+                    strikethrough: true,
+                    superscript: nil,
+                    link: nil,
+                    attachmentInfo: nil
+                ),
+                AppleNotesDecodedAttributeRun(
+                    length: ("kr1r" as NSString).length,
+                    paragraphStyle: nil,
+                    fontWeight: nil,
+                    underlined: false,
+                    strikethrough: true,
+                    superscript: nil,
+                    link: nil,
+                    attachmentInfo: nil
+                ),
+                AppleNotesDecodedAttributeRun(
+                    length: ("mep" as NSString).length,
+                    paragraphStyle: nil,
+                    fontWeight: nil,
+                    underlined: false,
+                    strikethrough: true,
+                    superscript: nil,
+                    link: nil,
+                    attachmentInfo: nil
+                ),
+            ]
+        )
+
+        let rendered = try renderer.render(note: note) { _ in
+            .inlineText("")
+        }
+
+        #expect(rendered.markdownTemplate == "alternative email: [p@peizh.live](mailto:p@peizh.live)\n~~jgznkr1rmep~~")
+    }
+
+    @Test
     func injectsAttachmentTokensAndCollectsResolvedAttachments() throws {
         let note = makeNote(
             segments: [
