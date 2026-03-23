@@ -12,7 +12,7 @@ struct AppSettingsTests {
         #expect(settings.slashCommandItems.count == SlashCommandItemSetting.defaultOrder.count)
         #expect(settings.slashCommandItems.filter(\.isVisible).map(\.command) == SlashCommandItemSetting.defaultVisibleCommands)
         #expect(settings.automaticSyncEnabled == false)
-        #expect(settings.automaticSyncInterval == .fifteenMinutes)
+        #expect(settings.automaticSyncInterval == .thirtyMinutes)
     }
 
     @Test
@@ -37,7 +37,7 @@ struct AppSettingsTests {
         #expect(decoded.inlineToolbarItems == InlineToolbarItemSetting.default)
         #expect(decoded.slashCommandItems == SlashCommandItemSetting.default)
         #expect(decoded.automaticSyncEnabled == false)
-        #expect(decoded.automaticSyncInterval == .fifteenMinutes)
+        #expect(decoded.automaticSyncInterval == .thirtyMinutes)
     }
 
     @Test

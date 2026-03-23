@@ -40,7 +40,7 @@ struct AppSettings: Codable, Equatable, Sendable {
         attachmentFolderName: "_attachments",
         useObsidianAttachmentFolder: false,
         automaticSyncEnabled: false,
-        automaticSyncInterval: .fifteenMinutes,
+        automaticSyncInterval: .thirtyMinutes,
         syncDirection: .appleNotesToObsidian,
         enableInlineEnhancements: true,
         enableFormattingBar: true,
