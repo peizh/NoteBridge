@@ -296,7 +296,7 @@ struct SettingsView: View {
                         )
                     ) {
                         ForEach(AutomaticSyncInterval.allCases) { interval in
-                            Text(appModel.tf("Every %d minutes", interval.minutes)).tag(interval)
+                            Text(appModel.t(interval.displayKey)).tag(interval)
                         }
                     }
                     .disabled(!appModel.settings.automaticSyncEnabled)
