@@ -4,7 +4,7 @@ All notable user-visible changes to NotesBridge should be documented here.
 
 This file is the source of truth for GitHub Release notes and Sparkle update notes.
 
-## [Unreleased]
+## [0.2.2] - 2026-03-23
 
 ### Added
 
@@ -12,7 +12,14 @@ This file is the source of truth for GitHub Release notes and Sparkle update not
 
 ### Changed
 
+- Grouped build and update controls into a single Version section in Settings.
 - Updated the direct-download packaging and release workflow to publish a signed Sparkle appcast and Markdown release notes via GitHub Pages.
+
+### Distribution
+
+- Direct-download build.
+- Ad-hoc signed.
+- Not notarized yet.
 
 ## [0.2.1] - 2026-03-20
 
