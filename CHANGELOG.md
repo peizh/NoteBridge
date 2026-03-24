@@ -4,6 +4,26 @@ All notable user-visible changes to NotesBridge should be documented here.
 
 This file is the source of truth for GitHub Release notes and Sparkle update notes.
 
+## [0.2.4] - 2026-03-24
+
+### Added
+
+- Added incremental sync controls in Settings, with manual `Sync Changed Notes`, explicit `Run Full Sync`, and automatic sync intervals for 30 minutes, 1 hour, 6 hours, or daily.
+- Added a `_Removed` flow for source notes deleted from Apple Notes, so synced exports are moved aside instead of being hard-deleted.
+
+### Fixed
+
+- Fixed incremental sync repeatedly falling back to full sync because Apple Notes cloud-placeholder records without local body data were being treated as changed notes.
+- Fixed incremental sync status reporting to distinguish processed, added, updated, and unchanged notes more accurately.
+- Fixed sync change counts so `updated` reflects real file changes instead of housekeeping-only attachment directory cleanup.
+- Improved fallback messaging when incremental sync must switch to a full sync, so the reason is explicit.
+
+### Distribution
+
+- Direct-download build.
+- Ad-hoc signed.
+- Not notarized yet.
+
 ## [0.2.3] - 2026-03-23
 
 ### Fixed
