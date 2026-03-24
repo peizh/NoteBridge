@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>NotesBridge | Apple Notes to Markdown on macOS</title>
+    <meta
+      name="description"
+      content="NotesBridge is a native macOS companion for Apple Notes. Add inline editing tools, export notes into local Markdown folders, and keep a durable workspace for search, versioning, and AI agents."
+    >
+    <meta name="theme-color" content="#f6efe2">
+    <meta property="og:title" content="NotesBridge">
+    <meta
+      property="og:description"
+      content="Write in Apple Notes. Keep the durable copy in Markdown."
+    >
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://peizh.github.io/NoteBridge/">
+    <meta
+      property="og:image"
+      content="https://peizh.github.io/NoteBridge/assets/notesbridge-social.svg"
+    >
+    <link rel="icon" href="./assets/notesbridge-app-icon.svg" type="image/svg+xml">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&amp;family=Manrope:wght@400;500;600;700;800&amp;display=swap"
+      rel="stylesheet"
+    >
+    <link rel="stylesheet" href="./styles.css">
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="topbar">
+        <a class="brand" href="#top" aria-label="NotesBridge home">
+          <img src="./assets/notesbridge-app-icon.svg" alt="">
+          <span>NotesBridge</span>
+        </a>
+        <nav class="topnav" aria-label="Primary">
+          <a href="#features">Features</a>
+          <a href="#workflow">Workflow</a>
+          <a href="#faq">FAQ</a>
+          <a href="https://github.com/peizh/NoteBridge">GitHub</a>
+          <a href="https://github.com/peizh/NoteBridge/releases">Releases</a>
+        </nav>
+      </header>
+
+      <main id="top">
+        <section class="hero section">
+          <div class="hero-copy">
+            <p class="eyebrow">Open-source macOS companion for Apple Notes</p>
+            <h1>Write in Apple Notes. Keep the durable copy in Markdown.</h1>
+            <p class="hero-intro">
+              NotesBridge runs as a menu bar app, adds inline editing tools on top of
+              Apple Notes, and syncs notes into local folders you can keep, search,
+              version, and hand to AI agents.
+            </p>
+            <div class="hero-actions">
+              <a class="button button-primary" href="https://github.com/peizh/NoteBridge/releases">
+                Download latest build
+              </a>
+              <a class="button button-secondary" href="https://github.com/peizh/NoteBridge">
+                View source on GitHub
+              </a>
+            </div>
+            <ul class="hero-points">
+              <li>macOS only</li>
+              <li>Menu bar app</li>
+              <li>Apple Notes -> local Markdown</li>
+            </ul>
+          </div>
+
+          <div class="hero-visual" aria-label="NotesBridge workflow preview">
+            <article class="panel panel-note">
+              <div class="panel-label">Inline editing</div>
+              <h2>Apple Notes, with the missing shortcuts back.</h2>
+              <div class="editor-preview">
+                <p>Project kickoff notes</p>
+                <p class="preview-line">Review API scope and launch plan</p>
+                <div class="slash-menu">
+                  <span>/</span>
+                  <div>
+                    <strong>Format title</strong>
+                    <small>Slash command</small>
+                  </div>
+                </div>
+              </div>
+            </article>
+
+            <article class="panel panel-pipeline">
+              <div class="panel-label">Bridge</div>
+              <div class="pipeline">
+                <div class="pipeline-node">
+                  <span>Apple Notes</span>
+                  <small>Capture, share, edit on phone</small>
+                </div>
+                <div class="pipeline-link" aria-hidden="true"></div>
+                <div class="pipeline-node">
+                  <span>Markdown workspace</span>
+                  <small>Folders, files, attachments, metadata</small>
+                </div>
+              </div>
+            </article>
+
+            <article class="panel panel-markdown">
+              <div class="panel-label">Output</div>
+              <pre><code>---
+title: Project kickoff notes
+tags: [meeting, launch]
+---
+
+# Project kickoff notes
+
+Review API scope and launch plan.
+
+[[Launch Checklist]]</code></pre>
+            </article>
+          </div>
+        </section>
+
+        <section class="section story">
+          <div class="section-heading">
+            <p class="eyebrow">Why it exists</p>
+            <h2>Apple Notes is convenient. Local Markdown is durable.</h2>
+          </div>
+          <div class="story-grid">
+            <p>
+              Apple Notes is excellent for quick capture, phone-first editing, and
+              notes shared with family or teammates. But when the long-term version
+              of your notes needs to be searchable, scriptable, versioned, and ready
+              for AI workflows, local Markdown still wins.
+            </p>
+            <p>
+              NotesBridge is built for people who want both: keep writing in Apple
+              Notes, then turn that note graph into a local-first workspace without
+              throwing away folders, attachments, front matter, or internal links.
+            </p>
+          </div>
+        </section>
+
+        <section class="section snapshot">
+          <div class="section-heading">
+            <p class="eyebrow">Project snapshot</p>
+            <h2>The repo is public. The app is practical. The design stays out of the way.</h2>
+          </div>
+          <div class="snapshot-frame">
+            <img
+              src="./assets/notesbridge-social.svg"
+              alt="NotesBridge banner showing Apple Notes to Markdown workflow"
+            >
+          </div>
+        </section>
+
+        <section class="section features" id="features">
+          <div class="section-heading">
+            <p class="eyebrow">What it does today</p>
+            <h2>Two jobs, one bridge.</h2>
+          </div>
+          <div class="feature-layout">
+            <article class="feature feature-large">
+              <div class="feature-kicker">Editing layer</div>
+              <h3>Enhance the macOS editing experience without replacing Apple Notes.</h3>
+              <ul>
+                <li>Slash commands with inline exact-match execution</li>
+                <li>Markdown-style triggers for lists and structure</li>
+                <li>Floating formatting toolbar after text selection</li>
+              </ul>
+            </article>
+
+            <article class="feature">
+              <div class="feature-kicker">Sync output</div>
+              <h3>Export to local folders that stay useful outside the app.</h3>
+              <ul>
+                <li>Folder structure preserved</li>
+                <li>Native attachments exported</li>
+                <li>Front matter and internal links retained</li>
+              </ul>
+            </article>
+
+            <article class="feature">
+              <div class="feature-kicker">AI-ready workspace</div>
+              <h3>Make shared notes easier to organize, automate, version, and inspect.</h3>
+              <ul>
+                <li>Works with local-first vault-style workflows</li>
+                <li>Better handoff into Git, search, and agent tooling</li>
+                <li>Useful even when Apple Notes remains the capture layer</li>
+              </ul>
+            </article>
+          </div>
+        </section>
+
+        <section class="section workflow" id="workflow">
+          <div class="section-heading">
+            <p class="eyebrow">Workflow</p>
+            <h2>Use Apple Notes for input, keep Markdown for the durable copy.</h2>
+          </div>
+          <ol class="workflow-list">
+            <li>
+              <strong>Install and grant permissions.</strong>
+              NotesBridge runs as a lightweight menu bar app and asks for the macOS
+              permissions needed for inline enhancements and full-note sync.
+            </li>
+            <li>
+              <strong>Point the app at the Apple Notes data folder on first full sync.</strong>
+              That lets NotesBridge read the Notes database and attachment files
+              directly from `group.com.apple.notes`.
+            </li>
+            <li>
+              <strong>Keep writing in Apple Notes while the exported workspace stays local.</strong>
+              The result is a Markdown folder structure that is easier to inspect,
+              automate, and collaborate on with AI agents.
+            </li>
+          </ol>
+        </section>
+
+        <section class="section constraints">
+          <div class="section-heading">
+            <p class="eyebrow">Current constraints</p>
+            <h2>Deliberately conservative where Apple Notes stays closed.</h2>
+          </div>
+          <ul class="constraint-list">
+            <li>Apple Notes exposes no public plugin API, so NotesBridge is a companion app, not an in-app extension.</li>
+            <li>Inline enhancements depend on Accessibility and event synthesis.</li>
+            <li>The current sync direction is Apple Notes -> local folders, with no reverse sync.</li>
+            <li>Slash commands currently favor exact command plus space and mouse-driven suggestion selection.</li>
+          </ul>
+        </section>
+
+        <section class="section faq" id="faq">
+          <div class="section-heading">
+            <p class="eyebrow">Q&amp;A</p>
+            <h2>The questions people usually ask first.</h2>
+          </div>
+          <div class="faq-grid">
+            <details open>
+              <summary>Is NotesBridge a plugin inside Apple Notes?</summary>
+              <p>
+                No. Apple Notes does not expose a public plugin or extension API, so
+                NotesBridge runs as a separate macOS companion app.
+              </p>
+            </details>
+
+            <details>
+              <summary>Does it sync back into Apple Notes?</summary>
+              <p>
+                Not today. The current design is intentionally one-way:
+                Apple Notes -> local Markdown folders.
+              </p>
+            </details>
+
+            <details>
+              <summary>Why not just export from Apple Notes manually?</summary>
+              <p>
+                The native export path is weak for ongoing workflows. NotesBridge is
+                built around repeated sync, folder preservation, attachment export,
+                and keeping the output useful for local-first tooling.
+              </p>
+            </details>
+
+            <details>
+              <summary>Does it work with shared notes?</summary>
+              <p>
+                Yes. Shared Apple Notes are part of the intended workflow. The goal is
+                to turn that shared input into a Markdown workspace that stays local
+                and easier to process afterward.
+              </p>
+            </details>
+
+            <details>
+              <summary>What survives the sync?</summary>
+              <p>
+                The current export keeps folder structure, native attachments, front
+                matter metadata, and internal links. That is the core product shape.
+              </p>
+            </details>
+
+            <details>
+              <summary>Where should I read more or use another language?</summary>
+              <p>
+                The repository README remains the canonical reference. You can read it
+                in <a href="https://github.com/peizh/NoteBridge/blob/main/README.zh-CN.md">简体中文</a>
+                or
+                <a href="https://github.com/peizh/NoteBridge/blob/main/README.fr.md">Français</a>.
+              </p>
+            </details>
+          </div>
+        </section>
+      </main>
+
+      <footer class="site-footer">
+        <div>
+          <strong>NotesBridge</strong>
+          <p>Native macOS companion for Apple Notes, local Markdown, and AI-friendly note workflows.</p>
+        </div>
+        <div class="footer-links">
+          <a href="https://github.com/peizh/NoteBridge">GitHub</a>
+          <a href="https://github.com/peizh/NoteBridge/releases">Releases</a>
+          <a href="https://github.com/peizh/NoteBridge/blob/main/README.md">README</a>
+          <a href="https://github.com/peizh/NoteBridge/blob/main/LICENSE">MIT License</a>
+        </div>
+      </footer>
+    </div>
+  </body>
+</html>
