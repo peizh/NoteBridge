@@ -9,6 +9,8 @@
 
 ![NotesBridge social banner](./images/notesbridge-social.svg)
 
+网站: [peizh.github.io/NoteBridge](https://peizh.github.io/NoteBridge/)
+
 NotesBridge 是一个面向 Apple Notes 的原生 macOS 伴侣应用。它以菜单栏应用的形式运行，在 Apple Notes 之上提供行内编辑增强能力，并将笔记导出为可保存、搜索、版本管理、并可与 AI agents 协作的本地 Markdown 文件和文件夹。
 
 ## 状态

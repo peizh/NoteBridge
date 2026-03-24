@@ -1,0 +1,63 @@
+name: Pages
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/pages.yml"
+      - "site/**"
+  workflow_dispatch:
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Publish site to gh-pages
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          SOURCE_DIR="$GITHUB_WORKSPACE/site"
+          SITE_DIR="$RUNNER_TEMP/gh-pages"
+          REMOTE_URL="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+
+          if git ls-remote --exit-code --heads origin gh-pages >/dev/null 2>&1; then
+            git clone --depth 1 --branch gh-pages "$REMOTE_URL" "$SITE_DIR"
+          else
+            git init "$SITE_DIR"
+            (
+              cd "$SITE_DIR"
+              git checkout --orphan gh-pages
+              git remote add origin "$REMOTE_URL"
+            )
+          fi
+
+          find "$SITE_DIR" -mindepth 1 -maxdepth 1 ! -name .git ! -name updates -exec rm -rf {} +
+          cp -R "$SOURCE_DIR"/. "$SITE_DIR"/
+          touch "$SITE_DIR/.nojekyll"
+
+          cd "$SITE_DIR"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .
+
+          if git diff --cached --quiet; then
+            echo "No GitHub Pages changes to publish."
+            exit 0
+          fi
+
+          git commit -m "Publish GitHub Pages site"
+          git push origin HEAD:gh-pages

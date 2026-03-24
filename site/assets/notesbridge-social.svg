@@ -1,0 +1,213 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2560" height="1280" viewBox="0 0 2560 1280" fill="none">
+  <defs>
+    <!-- Background Gradient -->
+    <linearGradient id="bg" x1="0" y1="0" x2="2560" y2="1280" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#020617"/>
+      <stop offset="0.5" stop-color="#081021"/>
+      <stop offset="1" stop-color="#0B162C"/>
+    </linearGradient>
+
+    <!-- Glowing Accents Gradients -->
+    <linearGradient id="accent-amber" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#F59E0B"/>
+      <stop offset="1" stop-color="#F43F5E"/>
+    </linearGradient>
+    <linearGradient id="accent-purple" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#818CF8"/>
+      <stop offset="1" stop-color="#C084FC"/>
+    </linearGradient>
+
+    <!-- Bento Box Material & Borders -->
+    <linearGradient id="bento-bg" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="#1E293B" stop-opacity="0.45"/>
+      <stop offset="1" stop-color="#0F172A" stop-opacity="0.75"/>
+    </linearGradient>
+    <linearGradient id="bento-border" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#FFFFFF" stop-opacity="0.15"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0.02"/>
+    </linearGradient>
+
+    <!-- Filters -->
+    <filter id="blur-bg" x="-20%" y="-20%" width="140%" height="140%" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="120"/>
+    </filter>
+    <filter id="shadow-lg" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="24" stdDeviation="32" flood-color="#000000" flood-opacity="0.5"/>
+    </filter>
+    <filter id="shadow-sm" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#000000" flood-opacity="0.4"/>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="2560" height="1280" fill="url(#bg)"/>
+
+  <!-- Ambient Glowing Orbs -->
+  <g filter="url(#blur-bg)" opacity="0.6">
+    <circle cx="200" cy="150" r="350" fill="#F59E0B" opacity="0.2"/>
+    <circle cx="2200" cy="300" r="450" fill="#818CF8" opacity="0.2"/>
+    <circle cx="1500" cy="1000" r="400" fill="#0EA5E9" opacity="0.15"/>
+  </g>
+
+  <!-- LEFT SECTION: Branding & Copy -->
+  
+  <!-- App Icon -->
+  <g transform="translate(160, 140)">
+    <rect width="120" height="120" rx="32" fill="url(#accent-amber)"/>
+    <!-- Abstract Bridge / Note Icon inside -->
+    <path d="M40 36H80C84.418 36 88 39.582 88 44V84C88 88.418 84.418 92 80 92H40C35.582 92 32 88.418 32 84V44C32 39.582 35.582 36 40 36Z" fill="#FFFFFF" fill-opacity="0.2"/>
+    <path d="M32 60C50 60 55 40 88 40" stroke="#FFFFFF" stroke-width="8" stroke-linecap="round" fill="none"/>
+    <path d="M48 74H72" stroke="#FFFFFF" stroke-width="8" stroke-linecap="round"/>
+  </g>
+
+  <!-- Typography -->
+  <text x="160" y="400" fill="#F8FAFC" font-size="140" font-family="Inter, -apple-system, sans-serif" font-weight="800" letter-spacing="-4">NotesBridge</text>
+  
+  <text font-family="Inter, -apple-system, sans-serif" font-size="44" fill="#94A3B8" font-weight="400" line-height="1.5">
+    <tspan x="160" y="490">Apple Notes companion app for inline</tspan>
+    <tspan x="160" y="555">tools and seamless Obsidian sync.</tspan>
+  </text>
+
+  <!-- Feature Tags (Pills) -->
+  <g font-family="Inter, -apple-system, sans-serif" font-size="24" font-weight="500" fill="#E2E8F0">
+    <!-- Tag 1 -->
+    <g transform="translate(160, 640)">
+      <rect width="250" height="64" rx="32" fill="url(#bento-bg)" stroke="url(#bento-border)" stroke-width="2"/>
+      <circle cx="36" cy="32" r="8" fill="#22C55E"/>
+      <text x="60" y="40">Native Sync</text>
+    </g>
+    <!-- Tag 2 -->
+    <g transform="translate(430, 640)">
+      <rect width="300" height="64" rx="32" fill="url(#bento-bg)" stroke="url(#bento-border)" stroke-width="2"/>
+      <circle cx="36" cy="32" r="8" fill="#0EA5E9"/>
+      <text x="60" y="40">Slash Commands</text>
+    </g>
+    <!-- Tag 3 -->
+    <g transform="translate(750, 640)">
+      <rect width="250" height="64" rx="32" fill="url(#bento-bg)" stroke="url(#bento-border)" stroke-width="2"/>
+      <circle cx="36" cy="32" r="8" fill="#F59E0B"/>
+      <text x="60" y="40">Wiki Links</text>
+    </g>
+  </g>
+
+  <!-- Main Value Prop -->
+  <g font-family="Inter, -apple-system, sans-serif" font-size="76" font-weight="700" letter-spacing="-2">
+    <text x="160" y="870" fill="#F8FAFC">Write in <tspan fill="#F59E0B">Apple Notes.</tspan></text>
+    <text x="160" y="970" fill="#F8FAFC">Build your brain in <tspan fill="#A78BFA">Obsidian.</tspan></text>
+  </g>
+
+
+  <!-- RIGHT SECTION: Bento Box Mockups -->
+  <g filter="url(#shadow-lg)">
+    
+    <!-- Bento 1: Bridge Header (Top Wide) -->
+    <g transform="translate(1320, 140)">
+      <rect width="1120" height="220" rx="40" fill="url(#bento-bg)" stroke="url(#bento-border)" stroke-width="1.5"/>
+      <text x="60" y="70" fill="#94A3B8" font-size="22" font-family="Inter, sans-serif" font-weight="600" letter-spacing="1" text-transform="uppercase">Pipeline</text>
+      
+      <!-- Nodes & Line -->
+      <path d="M 430 130 L 690 130" stroke="#334155" stroke-width="4" stroke-dasharray="12 12"/>
+      <!-- Animated/Glowing segment mock -->
+      <path d="M 500 130 L 610 130" stroke="#38BDF8" stroke-width="4" filter="url(#shadow-sm)"/>
+      <circle cx="610" cy="130" r="6" fill="#FFFFFF" filter="url(#shadow-sm)"/>
+
+      <!-- Apple Notes Side -->
+      <rect x="110" y="90" width="80" height="80" rx="20" fill="#1E293B" stroke="#334155"/>
+      <g transform="translate(129,106)">
+        <rect width="42" height="48" rx="10" fill="#FFF7ED"/>
+        <path d="M0 10C0 4.477 4.477 0 10 0H32C37.523 0 42 4.477 42 10V14H0V10Z" fill="#FBBF24"/>
+        <path d="M27 0H32C37.523 0 42 4.477 42 10V15L27 0Z" fill="#F59E0B"/>
+        <path d="M9 24H33M9 32H33M9 40H25" stroke="#F59E0B" stroke-width="4" stroke-linecap="round"/>
+      </g>
+      
+      <!-- Obsidian Side -->
+      <rect x="970" y="90" width="80" height="80" rx="20" fill="#1E293B" stroke="#334155"/>
+      <g transform="translate(985,107)">
+        <path d="M24 2L35 33L24 50L12 33Z" fill="#C4B5FD"/>
+        <path d="M12 33L24 50L2 24Z" fill="#818CF8"/>
+        <path d="M35 33L24 50L46 38Z" fill="#A78BFA"/>
+        <path d="M24 2L12 33L17 18Z" fill="#DDD6FE"/>
+        <path d="M24 2L35 33L31 18Z" fill="#8B5CF6"/>
+        <path d="M12 33L24 28L35 33L24 50Z" fill="#7C3AED" fill-opacity="0.18"/>
+      </g>
+
+      <text x="230" y="140" fill="#E2E8F0" font-size="32" font-family="Inter, sans-serif" font-weight="600">Notes</text>
+      <text x="740" y="140" fill="#E2E8F0" font-size="30" font-family="Inter, sans-serif" font-weight="600">Obsidian Vault</text>
+    </g>
+
+    <!-- Bento 2: Slash Command UI (Bottom Left) -->
+    <g transform="translate(1320, 390)">
+      <rect width="545" height="520" rx="40" fill="url(#bento-bg)" stroke="url(#bento-border)" stroke-width="1.5"/>
+      
+      <!-- Mac Window Controls -->
+      <circle cx="45" cy="45" r="8" fill="#EF4444"/>
+      <circle cx="75" cy="45" r="8" fill="#F59E0B"/>
+      <circle cx="105" cy="45" r="8" fill="#22C55E"/>
+      
+      <text x="45" y="120" fill="#F8FAFC" font-size="36" font-family="Inter, sans-serif" font-weight="700">Meeting Notes</text>
+      <text x="45" y="180" fill="#94A3B8" font-size="28" font-family="Inter, sans-serif">Discussing the new architectural</text>
+      <text x="45" y="225" fill="#94A3B8" font-size="28" font-family="Inter, sans-serif">patterns for the platform.</text>
+      <text x="45" y="280" fill="#38BDF8" font-size="32" font-family="Inter, sans-serif" font-weight="500">/</text>
+      
+      <!-- Popover Menu -->
+      <g transform="translate(60, 290)" filter="url(#shadow-sm)">
+        <rect width="400" height="200" rx="20" fill="#0F172A" stroke="#334155" stroke-width="1.5"/>
+        <text x="24" y="40" fill="#64748B" font-size="16" font-family="Inter, sans-serif" font-weight="600" text-transform="uppercase">Inline Tools</text>
+        
+        <!-- Hovered Item -->
+        <rect x="12" y="55" width="376" height="60" rx="12" fill="#1E293B"/>
+        <text x="32" y="93" fill="#F8FAFC" font-size="24" font-family="Inter, sans-serif">🪄</text>
+        <text x="75" y="93" fill="#F8FAFC" font-size="24" font-family="Inter, sans-serif" font-weight="500">Format Title</text>
+        
+        <!-- Unhovered Item -->
+        <text x="32" y="155" fill="#94A3B8" font-size="24" font-family="Inter, sans-serif">📎</text>
+        <text x="75" y="155" fill="#94A3B8" font-size="24" font-family="Inter, sans-serif" font-weight="500">Attach File</text>
+      </g>
+    </g>
+
+    <!-- Bento 3: Obsidian Markdown (Bottom Right) -->
+    <g transform="translate(1895, 390)">
+      <rect width="545" height="520" rx="40" fill="url(#bento-bg)" stroke="url(#bento-border)" stroke-width="1.5"/>
+      
+      <!-- Mac Window Controls -->
+      <circle cx="45" cy="45" r="8" fill="#334155"/>
+      <circle cx="75" cy="45" r="8" fill="#334155"/>
+      <circle cx="105" cy="45" r="8" fill="#334155"/>
+      <text x="210" y="52" fill="#64748B" font-size="18" font-family="Inter, sans-serif" font-weight="500">Meeting Notes.md</text>
+
+      <!-- Markdown Content -->
+      <text font-family="SF Mono, Menlo, monospace" font-size="24" fill="#F8FAFC">
+        <!-- Frontmatter -->
+        <tspan x="45" y="120" fill="#64748B">---</tspan>
+        <tspan x="45" y="160" fill="#38BDF8">date</tspan><tspan fill="#94A3B8">: 2026-03-11</tspan>
+        <tspan x="45" y="200" fill="#38BDF8">tags</tspan><tspan fill="#94A3B8">: [meeting, architecture]</tspan>
+        <tspan x="45" y="240" fill="#64748B">---</tspan>
+        
+        <!-- Content -->
+        <tspan x="45" y="320" fill="#A78BFA" font-weight="700"># Meeting Notes</tspan>
+        <tspan x="45" y="380" fill="#94A3B8">Discussing the new architectural</tspan>
+        <tspan x="45" y="425" fill="#94A3B8">patterns for the platform.</tspan>
+        
+        <!-- Link -->
+        <tspan x="45" y="485" fill="#A78BFA">[[</tspan><tspan fill="#E2E8F0">Platform V2 Spec</tspan><tspan fill="#A78BFA">]]</tspan>
+      </text>
+    </g>
+
+    <!-- Bento 4: Sync Status (Bottom Wide) -->
+    <g transform="translate(1320, 940)">
+      <rect width="1120" height="200" rx="40" fill="url(#bento-bg)" stroke="url(#bento-border)" stroke-width="1.5"/>
+      
+      <text x="60" y="80" fill="#F8FAFC" font-size="32" font-family="Inter, sans-serif" font-weight="700">Sync Snapshot</text>
+      <text x="290" y="80" fill="#64748B" font-size="24" font-family="Inter, sans-serif">• 426 notes • 12 folders • 84 attachments</text>
+      
+      <!-- Progress Bar Track -->
+      <rect x="60" y="125" width="1000" height="16" rx="8" fill="#0F172A" stroke="#1E293B" stroke-width="2"/>
+      <!-- Progress Bar Fill -->
+      <rect x="62" y="127" width="760" height="12" rx="6" fill="url(#accent-purple)"/>
+      <!-- Glowing dot indicator -->
+      <circle cx="820" cy="133" r="10" fill="#FFFFFF" filter="url(#shadow-sm)"/>
+      <circle cx="820" cy="133" r="4" fill="#C084FC"/>
+    </g>
+
+  </g>
+</svg>
