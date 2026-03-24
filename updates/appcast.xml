@@ -1,0 +1,21 @@
+<?xml version="1.0" standalone="yes"?><!-- sparkle-sign-warning:
+IMPORTANT: This file was signed by Sparkle. Any modifications to this file requires re-signing this file with generate_appcast or sign_update! The signed signature will be embedded at the end of this file.
+--><rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
+    <channel>
+        <title>NotesBridge</title>
+        <item>
+            <title>0.2.5</title>
+            <pubDate>Tue, 24 Mar 2026 02:15:21 +0000</pubDate>
+            <link>https://github.com/peizh/NoteBridge/releases</link>
+            <sparkle:version>6</sparkle:version>
+            <sparkle:shortVersionString>0.2.5</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>10.13</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <sparkle:releaseNotesLink sparkle:edSignature="80kFGz4ELuaFtOdykYDXE0Ao5MT+N/VEbfxCEnYIpuoWdWxu8Rumc7WISJp8VbTKCk/Hi5ak2j3Ogp7LPSbcBA==" sparkle:length="847">https://peizh.github.io/NoteBridge/updates/NotesBridge-0.2.5-macOS.md</sparkle:releaseNotesLink>
+            <enclosure url="https://github.com/peizh/NoteBridge/releases/download/0.2.5/NotesBridge-0.2.5-macOS.zip" length="3440134" type="application/octet-stream" sparkle:edSignature="d5bIWsnAbOEj+x4WOLpaGiLqRLf2re8xaJi/imUJule2bfPG5qqxSw0ZZhEaXsRfjJR6Ir7zZeGGi4Y53fRXBA=="></enclosure>
+        </item>
+    </channel>
+</rss><!-- sparkle-signatures:
+edSignature: CxMf+Ri2RhKmQi5oM5dexjU4xb6QjKcu0ePyXH7wsX3cTwEMs94noiXEsDWqN3p683dFFJlgMkTmnh0E8UEWBg==
+length: 1468
+-->
