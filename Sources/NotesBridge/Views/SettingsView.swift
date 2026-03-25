@@ -309,17 +309,32 @@ struct SettingsView: View {
                     )
 
                     Picker(
-                        appModel.t("Automatic Sync Interval"),
+                        appModel.t("Automatic Sync Trigger"),
                         selection: Binding(
-                            get: { appModel.settings.automaticSyncInterval },
-                            set: { appModel.settings.automaticSyncInterval = $0 }
+                            get: { appModel.settings.automaticSyncTrigger },
+                            set: { appModel.settings.automaticSyncTrigger = $0 }
                         )
                     ) {
-                        ForEach(AutomaticSyncInterval.allCases) { interval in
-                            Text(appModel.t(interval.displayKey)).tag(interval)
+                        ForEach(AutomaticSyncTrigger.allCases) { trigger in
+                            Text(appModel.t(trigger.displayKey)).tag(trigger)
                         }
                     }
                     .disabled(!appModel.settings.automaticSyncEnabled)
+
+                    if appModel.settings.automaticSyncTrigger == .periodic {
+                        Picker(
+                            appModel.t("Automatic Sync Interval"),
+                            selection: Binding(
+                                get: { appModel.settings.automaticSyncInterval },
+                                set: { appModel.settings.automaticSyncInterval = $0 }
+                            )
+                        ) {
+                            ForEach(AutomaticSyncInterval.allCases) { interval in
+                                Text(appModel.t(interval.displayKey)).tag(interval)
+                            }
+                        }
+                        .disabled(!appModel.settings.automaticSyncEnabled)
+                    }
 
                     HStack {
                         Button(appModel.t("Refresh Folder Index")) {
