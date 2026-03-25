@@ -16,6 +16,9 @@ enum FloatingToolPaletteStyle {
     static let rowVerticalPadding: CGFloat = 5
     static let rowSpacing: CGFloat = 6
     static let rowSelectionOpacity: CGFloat = 0.15
+
+    static let surfaceHorizontalPadding: CGFloat = 8
+    static let jitterTolerance: CGFloat = 0.5
 }
 
 struct FloatingToolPaletteIcon: View {

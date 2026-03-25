@@ -79,8 +79,8 @@ struct SettingsView: View {
                     }
 
                     LabeledContent(appModel.t("Accessibility")) {
-                        Text(appModel.interactionAvailability.accessibilityGranted ? appModel.t("Granted") : appModel.t("Required"))
-                            .foregroundStyle(appModel.interactionAvailability.accessibilityGranted ? .green : .orange)
+                        Text(appModel.interactionState.availability.accessibilityGranted ? appModel.t("Granted") : appModel.t("Required"))
+                            .foregroundStyle(appModel.interactionState.availability.accessibilityGranted ? .green : .orange)
                     }
 
                     HStack {
@@ -109,7 +109,7 @@ struct SettingsView: View {
                     Text(appModel.inlineEnhancementsSummary)
                         .foregroundStyle(.secondary)
 
-                    if appModel.isRunningBundledApp && !appModel.interactionAvailability.accessibilityGranted {
+                    if appModel.isRunningBundledApp && !appModel.interactionState.availability.accessibilityGranted {
                         Text(appModel.t("If NotesBridge is already checked in Accessibility but still shows Required here, remove it and add the current NotesBridge.app bundle again."))
                             .foregroundStyle(.secondary)
                     }

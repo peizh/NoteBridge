@@ -77,8 +77,8 @@ final class SlashCommandEngine {
             snapshot = contextMonitor.editingSnapshot(from: currentEditingContext.element, includeValue: true)
             recordDiagnostic("slash panel owns keyboard focus; refreshing from cached notes editor")
         } else {
-            guard contextMonitor.availability.canRunSlashCommands else {
-                recordDiagnostic("snapshot unavailable for slash evaluation")
+            guard contextMonitor.state.availability.canRunSlashCommands else {
+                recordDiagnostic("slash panel unavailable for slash evaluation")
                 lastCommittedSignature = nil
                 hideMenu()
                 return
