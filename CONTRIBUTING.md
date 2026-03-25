@@ -127,6 +127,14 @@ swift test
 xcodebuild -scheme NotesBridge -workspace .swiftpm/xcode/package.xcworkspace -destination 'platform=macOS' test
 ```
 
+Use the bundled app flow for runtime-sensitive checks:
+
+```bash
+./scripts/notesbridge.sh dev
+```
+
+`./scripts/run-bundled-app.sh` is not part of the current repository. Older notes that mention it should be read as `./scripts/notesbridge.sh dev`.
+
 If the change affects runtime behavior, also do the relevant manual validation, for example:
 
 - Apple Notes -> Obsidian sync

@@ -14,6 +14,11 @@ This file is the source of truth for GitHub Release notes and Sparkle update not
 
 - Unified local build, run, release, notarization, appcast, and changelog extraction workflows behind `./scripts/notesbridge.sh`.
 - Aligned bundled-app version metadata with the repository version source so local builds no longer report stale release numbers.
+- Refreshed developer docs to match the current single-app repository layout and the consolidated `./scripts/notesbridge.sh` workflow.
+
+### Fixed
+
+- Fixed Apple Notes table sync output so Markdown tables no longer pick up extra blank lines before and after the table block.
 
 ### Distribution
 
