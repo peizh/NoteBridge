@@ -2,20 +2,28 @@ import AppKit
 import ApplicationServices
 import Foundation
 
+struct InteractionState: Equatable {
+    var selectionContext: SelectionContext?
+    var availability: InteractionAvailability
+}
+
 @MainActor
 final class NotesContextMonitor: ObservableObject {
-    @Published private(set) var selectionContext: SelectionContext?
-    @Published private(set) var availability: InteractionAvailability
+    @Published private(set) var state: InteractionState
 
     private let permissionsManager: PermissionsManager
     private var settings: AppSettings
     private var timer: Timer?
     private let notesBundleIdentifier = "com.apple.Notes"
+    private var lastEditableElement: AXUIElement?
 
     init(buildFlavor: BuildFlavor, permissionsManager: PermissionsManager, settings: AppSettings) {
         self.permissionsManager = permissionsManager
         self.settings = settings
-        self.availability = .default(for: buildFlavor)
+        self.state = InteractionState(
+            selectionContext: nil,
+            availability: .default(for: buildFlavor)
+        )
     }
 
     func start() {
@@ -42,7 +50,7 @@ final class NotesContextMonitor: ObservableObject {
     }
 
     func editingSnapshot(includeValue: Bool) -> EditingContext? {
-        guard availability.supportsInlineEnhancements,
+        guard state.availability.supportsInlineEnhancements,
               permissionsManager.accessibilityGranted,
               isNotesFrontmost,
               let focusedElement = focusedUIElement,
@@ -55,7 +63,7 @@ final class NotesContextMonitor: ObservableObject {
     }
 
     func editingSnapshot(from element: AXUIElement, includeValue: Bool) -> EditingContext? {
-        guard availability.supportsInlineEnhancements,
+        guard state.availability.supportsInlineEnhancements,
               permissionsManager.accessibilityGranted,
               isEditable(element: element)
         else {
@@ -89,33 +97,59 @@ final class NotesContextMonitor: ObservableObject {
     private func refreshNow() {
         permissionsManager.refresh()
 
-        let notesIsFrontmost = isNotesFrontmost
+        let frontmostApp = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
+        let isNotesAppFrontmost = frontmostApp == notesBundleIdentifier
+        let isNotesBridgeFrontmost = frontmostApp == Bundle.main.bundleIdentifier
+        let notesIsFrontmost = isNotesAppFrontmost || isNotesBridgeFrontmost
+        
         let accessibilityGranted = permissionsManager.accessibilityGranted
         let inputMonitoringGranted = permissionsManager.inputMonitoringGranted
         var editableFocus = false
         var nextSelectionContext: SelectionContext?
 
-        if availability.supportsInlineEnhancements,
+        if state.availability.buildFlavor.supportsInlineEnhancements,
            accessibilityGranted,
-           notesIsFrontmost,
-           let snapshot = editingSnapshot(includeValue: false)
+           notesIsFrontmost
         {
-            editableFocus = true
+            let isOurPanelKey = NSApp.windows.contains(where: { $0.isKeyWindow })
+            
+            if isNotesBridgeFrontmost || isOurPanelKey {
+                // If our panel is frontmost or has key focus, Apple Notes is inactive. Accessibility reads for selection bounds
+                // might be unstable or empty. Freeze the state to prevent flickering.
+                editableFocus = state.availability.editableFocus
+                nextSelectionContext = state.selectionContext
+            } else {
+                var elementToUse = focusedUIElement
+                
+                if elementToUse == nil || !isEditable(element: elementToUse!) {
+                    elementToUse = lastEditableElement
+                }
 
-            if snapshot.selectedRange.length > 0 {
-                nextSelectionContext = SelectionContext(
-                    selectedText: snapshot.selectedText,
-                    selectedRange: snapshot.selectedRange,
-                    selectionRect: snapshot.selectionRect,
-                    noteTitle: nil,
-                    folderName: nil
-                )
+                if let elementToUse, isEditable(element: elementToUse) {
+                    if let snapshot = snapshot(for: elementToUse, includeValue: false) {
+                        editableFocus = true
+                        lastEditableElement = elementToUse
+
+                        if snapshot.selectedRange.length > 0 {
+                            nextSelectionContext = SelectionContext(
+                                selectedText: snapshot.selectedText,
+                                selectedRange: snapshot.selectedRange,
+                                selectionRect: snapshot.selectionRect,
+                                noteTitle: nil,
+                                folderName: nil
+                            )
+                        }
+                    }
+                }
             }
         }
 
-        selectionContext = nextSelectionContext
-        availability = InteractionAvailability(
-            buildFlavor: availability.buildFlavor,
+        if !notesIsFrontmost {
+            lastEditableElement = nil
+        }
+
+        let nextAvailability = InteractionAvailability(
+            buildFlavor: state.availability.buildFlavor,
             accessibilityGranted: accessibilityGranted,
             inputMonitoringGranted: inputMonitoringGranted,
             notesIsFrontmost: notesIsFrontmost,
@@ -125,10 +159,20 @@ final class NotesContextMonitor: ObservableObject {
             markdownTriggersEnabled: settings.enableMarkdownTriggers,
             slashCommandsEnabled: settings.enableSlashCommands
         )
+
+        let nextState = InteractionState(
+            selectionContext: nextSelectionContext,
+            availability: nextAvailability
+        )
+
+        if state != nextState {
+            state = nextState
+        }
     }
 
     private var isNotesFrontmost: Bool {
-        NSWorkspace.shared.frontmostApplication?.bundleIdentifier == notesBundleIdentifier
+        let frontmost = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
+        return frontmost == notesBundleIdentifier || frontmost == Bundle.main.bundleIdentifier
     }
 
     private var focusedUIElement: AXUIElement? {

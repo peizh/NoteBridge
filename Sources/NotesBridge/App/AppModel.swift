@@ -84,8 +84,8 @@ final class AppModel: ObservableObject {
             refreshAppleNotesDataAccessStatus()
             scheduleAutomaticSyncIfNeeded()
             formattingBarController.update(
-                selectionContext: selectionContext,
-                availability: interactionAvailability,
+                selectionContext: interactionState.selectionContext,
+                availability: interactionState.availability,
                 commands: visibleInlineToolbarCommands,
                 localization: localization
             )
@@ -93,9 +93,8 @@ final class AppModel: ObservableObject {
     }
 
     @Published private(set) var buildFlavor: BuildFlavor
-    @Published private(set) var interactionAvailability: InteractionAvailability
+    @Published private(set) var interactionState: InteractionState
     @Published private(set) var folderSummaries: [AppleNotesFolder] = []
-    @Published private(set) var selectionContext: SelectionContext?
     @Published private(set) var isRefreshingFolders = false
     @Published private(set) var isSyncing = false
     @Published private(set) var menuBarSyncFrameIndex = 0
@@ -188,7 +187,10 @@ final class AppModel: ObservableObject {
         self.slashCommandEngine = slashCommandEngine
         self.formattingBarController = formattingBarController
         self.statusObserver = statusObserver
-        self.interactionAvailability = .default(for: resolvedBuildFlavor)
+        self.interactionState = InteractionState(
+            selectionContext: nil,
+            availability: .default(for: resolvedBuildFlavor)
+        )
         self.slashCommandEngine.onKeyboardNavigationAvailabilityChanged = { [weak self] isAvailable in
             self?.slashKeyboardNavigationAvailable = isAvailable
         }
@@ -306,7 +308,7 @@ final class AppModel: ObservableObject {
     }
 
     var selectionSummary: String {
-        guard let selectionContext, selectionContext.hasSelection else {
+        guard let selectionContext = interactionState.selectionContext, selectionContext.hasSelection else {
             return t("No text selected")
         }
 
@@ -330,10 +332,10 @@ final class AppModel: ObservableObject {
         if isSyncing {
             return "arrow.triangle.2.circlepath"
         }
-        if interactionAvailability.canShowFormattingBar {
+        if interactionState.availability.canShowFormattingBar {
             return "text.cursor"
         }
-        if interactionAvailability.supportsInlineEnhancements && !interactionAvailability.accessibilityGranted {
+        if interactionState.availability.supportsInlineEnhancements && !interactionState.availability.accessibilityGranted {
             return "exclamationmark.circle"
         }
         return "note.text.badge.plus"
@@ -352,16 +354,16 @@ final class AppModel: ObservableObject {
         if visibleSlashCommandCatalog.entries.isEmpty {
             return t("No slash commands are enabled in Settings.")
         }
-        if !interactionAvailability.accessibilityGranted {
+        if !interactionState.availability.accessibilityGranted {
             if isRunningBundledApp {
                 return t("Accessibility permission is required for slash commands. If NotesBridge is already checked in Accessibility, remove and re-add the current app bundle once.")
             }
             return t("Accessibility permission is required for slash commands.")
         }
-        if !interactionAvailability.notesIsFrontmost {
+        if !interactionState.availability.notesIsFrontmost {
             return t("Bring Apple Notes to the front to use slash commands.")
         }
-        if !interactionAvailability.editableFocus {
+        if !interactionState.availability.editableFocus {
             return t("Focus the Apple Notes editor to use slash commands.")
         }
         if !slashKeyboardNavigationAvailable {
@@ -374,10 +376,10 @@ final class AppModel: ObservableObject {
         if !buildFlavor.supportsInlineEnhancements {
             return t("Inline enhancements are disabled in the Mac App Store build.")
         }
-        if isRunningBundledApp && !interactionAvailability.accessibilityGranted {
+        if isRunningBundledApp && !interactionState.availability.accessibilityGranted {
             return t("Grant Accessibility to NotesBridge. If it is already checked, remove and re-add the current app bundle once.")
         }
-        return t(interactionAvailability.summary)
+        return t(interactionState.availability.summary)
     }
 
     var attachmentStorageBasePath: String {
@@ -432,7 +434,7 @@ final class AppModel: ObservableObject {
         statusMessage = t("Requesting Accessibility permission for NotesBridge...")
         permissionsManager.requestAccessibilityPermission()
         notesContextMonitor.updateSettings(settings)
-        if interactionAvailability.accessibilityGranted {
+        if interactionState.availability.accessibilityGranted {
             statusMessage = t("Accessibility is already granted for NotesBridge.")
         } else if isRunningBundledApp {
             _ = permissionsManager.openAccessibilitySettings()
@@ -461,7 +463,7 @@ final class AppModel: ObservableObject {
         statusMessage = t("Requesting Input Monitoring permission for slash menu keyboard navigation...")
         permissionsManager.requestInputMonitoringPermission()
         notesContextMonitor.updateSettings(settings)
-        if interactionAvailability.inputMonitoringGranted {
+        if interactionState.availability.inputMonitoringGranted {
             statusMessage = t("Input Monitoring is already granted for NotesBridge.")
         } else {
             _ = permissionsManager.openInputMonitoringSettings()
@@ -1262,28 +1264,14 @@ final class AppModel: ObservableObject {
             }
             .store(in: &cancellables)
 
-        notesContextMonitor.$availability
+        notesContextMonitor.$state
             .receive(on: RunLoop.main)
-            .sink { [weak self] availability in
+            .sink { [weak self] state in
                 guard let self else { return }
-                self.interactionAvailability = availability
+                self.interactionState = state
                 self.formattingBarController.update(
-                    selectionContext: self.selectionContext,
-                    availability: availability,
-                    commands: self.visibleInlineToolbarCommands,
-                    localization: self.localization
-                )
-            }
-            .store(in: &cancellables)
-
-        notesContextMonitor.$selectionContext
-            .receive(on: RunLoop.main)
-            .sink { [weak self] selectionContext in
-                guard let self else { return }
-                self.selectionContext = selectionContext
-                self.formattingBarController.update(
-                    selectionContext: selectionContext,
-                    availability: self.interactionAvailability,
+                    selectionContext: state.selectionContext,
+                    availability: state.availability,
                     commands: self.visibleInlineToolbarCommands,
                     localization: self.localization
                 )
@@ -1336,7 +1324,7 @@ final class AppModel: ObservableObject {
         guard buildFlavor.supportsInlineEnhancements,
               settings.enableInlineEnhancements,
               isRunningBundledApp,
-              !interactionAvailability.accessibilityGranted
+              !interactionState.availability.accessibilityGranted
         else {
             return
         }
@@ -1346,7 +1334,7 @@ final class AppModel: ObservableObject {
                   self.isRunningBundledApp,
                   self.buildFlavor.supportsInlineEnhancements,
                   self.settings.enableInlineEnhancements,
-                  !self.interactionAvailability.accessibilityGranted
+                  !self.interactionState.availability.accessibilityGranted
             else {
                 return
             }

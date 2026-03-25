@@ -33,7 +33,7 @@ final class MarkdownTriggerEngine {
     }
 
     private func evaluatePendingTrigger() {
-        guard contextMonitor.availability.canRunMarkdownTriggers,
+        guard contextMonitor.state.availability.canRunMarkdownTriggers,
               let snapshot = contextMonitor.editingSnapshot(includeValue: true),
               snapshot.selectedRange.length == 0,
               let value = snapshot.value
