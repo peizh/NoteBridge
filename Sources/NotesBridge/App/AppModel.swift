@@ -129,6 +129,8 @@ final class AppModel: ObservableObject {
     private var syncIndex: SyncIndex
     private var syncAnimationCancellable: AnyCancellable?
     private var automaticSyncCancellable: AnyCancellable?
+    private let notesDatabaseWatcher: NotesDatabaseWatcher
+    private var pendingOnChangeSyncTask: Task<Void, Never>?
     private var cancellables: Set<AnyCancellable> = []
 
     init(
@@ -191,6 +193,10 @@ final class AppModel: ObservableObject {
             selectionContext: nil,
             availability: .default(for: resolvedBuildFlavor)
         )
+        self.notesDatabaseWatcher = NotesDatabaseWatcher()
+        self.notesDatabaseWatcher.onChange = { [weak self] in
+            self?.handleDatabaseChange()
+        }
         self.slashCommandEngine.onKeyboardNavigationAvailabilityChanged = { [weak self] isAvailable in
             self?.slashKeyboardNavigationAvailable = isAvailable
         }
@@ -1345,21 +1351,42 @@ final class AppModel: ObservableObject {
     private func scheduleAutomaticSyncIfNeeded() {
         automaticSyncCancellable?.cancel()
         automaticSyncCancellable = nil
+        notesDatabaseWatcher.stop()
+        pendingOnChangeSyncTask?.cancel()
+        pendingOnChangeSyncTask = nil
 
         guard settings.automaticSyncEnabled else {
             return
         }
 
-        automaticSyncCancellable = Timer.publish(
-            every: TimeInterval(settings.automaticSyncInterval.minutes * 60),
-            on: .main,
-            in: .common
-        )
-        .autoconnect()
-        .sink { [weak self] _ in
-            Task { [weak self] in
-                await self?.runAutomaticSyncIfNeeded()
+        switch settings.automaticSyncTrigger {
+        case .periodic:
+            automaticSyncCancellable = Timer.publish(
+                every: TimeInterval(settings.automaticSyncInterval.minutes * 60),
+                on: .main,
+                in: .common
+            )
+            .autoconnect()
+            .sink { [weak self] _ in
+                Task { [weak self] in
+                    await self?.runAutomaticSyncIfNeeded()
+                }
             }
+        case .onChange:
+            if let accessSession = resolveAppleNotesDataFolderAccessSession() {
+                notesDatabaseWatcher.start(dataFolderURL: accessSession.url)
+                accessSession.stopAccessing()
+            }
+        }
+    }
+
+    private func handleDatabaseChange() {
+        pendingOnChangeSyncTask?.cancel()
+        pendingOnChangeSyncTask = Task {
+            // Debounce 5 seconds
+            try? await Task.sleep(nanoseconds: 5 * 1_000_000_000)
+            if Task.isCancelled { return }
+            await runAutomaticSyncIfNeeded()
         }
     }
 

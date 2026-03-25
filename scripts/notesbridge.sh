@@ -32,7 +32,11 @@ notesbridge_resolve_build_number() {
     local build_number="${NOTESBRIDGE_BUILD_NUMBER:-$explicit_build_number}"
 
     if [[ -z "${build_number:-}" ]]; then
-        build_number="$(git -C "$NOTESBRIDGE_ROOT_DIR" rev-list --count HEAD 2>/dev/null || echo 1)"
+        local commit_count
+        commit_count="$(git -C "$NOTESBRIDGE_ROOT_DIR" rev-list --count HEAD 2>/dev/null || echo 1)"
+        local date_prefix
+        date_prefix="$(date +%Y%m%d)"
+        build_number="$date_prefix.$commit_count"
     fi
 
     printf '%s\n' "$build_number"

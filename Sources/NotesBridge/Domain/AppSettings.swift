@@ -22,6 +22,7 @@ struct AppSettings: Codable, Equatable, Sendable {
     var attachmentFolderName: String
     var useObsidianAttachmentFolder: Bool
     var automaticSyncEnabled: Bool
+    var automaticSyncTrigger: AutomaticSyncTrigger
     var automaticSyncInterval: AutomaticSyncInterval
     var syncDirection: SyncDirection
     var enableInlineEnhancements: Bool
@@ -40,6 +41,7 @@ struct AppSettings: Codable, Equatable, Sendable {
         attachmentFolderName: "_attachments",
         useObsidianAttachmentFolder: false,
         automaticSyncEnabled: false,
+        automaticSyncTrigger: .periodic,
         automaticSyncInterval: .thirtyMinutes,
         syncDirection: .appleNotesToObsidian,
         enableInlineEnhancements: true,
@@ -64,6 +66,7 @@ struct AppSettings: Codable, Equatable, Sendable {
         case attachmentFolderName
         case useObsidianAttachmentFolder
         case automaticSyncEnabled
+        case automaticSyncTrigger
         case automaticSyncInterval
         case autoSyncOnPush
         case syncDirection
@@ -84,6 +87,7 @@ struct AppSettings: Codable, Equatable, Sendable {
         attachmentFolderName: String,
         useObsidianAttachmentFolder: Bool,
         automaticSyncEnabled: Bool,
+        automaticSyncTrigger: AutomaticSyncTrigger,
         automaticSyncInterval: AutomaticSyncInterval,
         syncDirection: SyncDirection,
         enableInlineEnhancements: Bool,
@@ -101,6 +105,7 @@ struct AppSettings: Codable, Equatable, Sendable {
         self.attachmentFolderName = attachmentFolderName
         self.useObsidianAttachmentFolder = useObsidianAttachmentFolder
         self.automaticSyncEnabled = automaticSyncEnabled
+        self.automaticSyncTrigger = automaticSyncTrigger
         self.automaticSyncInterval = automaticSyncInterval
         self.syncDirection = syncDirection
         self.enableInlineEnhancements = enableInlineEnhancements
@@ -121,6 +126,7 @@ struct AppSettings: Codable, Equatable, Sendable {
         self.attachmentFolderName = try container.decodeIfPresent(String.self, forKey: .attachmentFolderName) ?? Self.default.attachmentFolderName
         self.useObsidianAttachmentFolder = try container.decodeIfPresent(Bool.self, forKey: .useObsidianAttachmentFolder) ?? Self.default.useObsidianAttachmentFolder
         self.automaticSyncEnabled = try container.decodeIfPresent(Bool.self, forKey: .automaticSyncEnabled) ?? Self.default.automaticSyncEnabled
+        self.automaticSyncTrigger = try container.decodeIfPresent(AutomaticSyncTrigger.self, forKey: .automaticSyncTrigger) ?? Self.default.automaticSyncTrigger
         self.automaticSyncInterval = try container.decodeIfPresent(AutomaticSyncInterval.self, forKey: .automaticSyncInterval) ?? Self.default.automaticSyncInterval
         self.syncDirection = try container.decodeIfPresent(SyncDirection.self, forKey: .syncDirection) ?? Self.default.syncDirection
         self.enableInlineEnhancements = try container.decodeIfPresent(Bool.self, forKey: .enableInlineEnhancements) ?? Self.default.enableInlineEnhancements
@@ -147,6 +153,7 @@ struct AppSettings: Codable, Equatable, Sendable {
         try container.encode(attachmentFolderName, forKey: .attachmentFolderName)
         try container.encode(useObsidianAttachmentFolder, forKey: .useObsidianAttachmentFolder)
         try container.encode(automaticSyncEnabled, forKey: .automaticSyncEnabled)
+        try container.encode(automaticSyncTrigger, forKey: .automaticSyncTrigger)
         try container.encode(automaticSyncInterval, forKey: .automaticSyncInterval)
         try container.encode(syncDirection, forKey: .syncDirection)
         try container.encode(enableInlineEnhancements, forKey: .enableInlineEnhancements)
