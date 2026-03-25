@@ -8,7 +8,63 @@ on:
   pull_request:
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      app_related: ${{ steps.filter.outputs.app_related }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Detect app-related changes
+        id: filter
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            base_sha="${{ github.event.pull_request.base.sha }}"
+            head_sha="${{ github.event.pull_request.head.sha }}"
+          else
+            base_sha="${{ github.event.before }}"
+            head_sha="${{ github.sha }}"
+          fi
+
+          if [[ -z "${base_sha:-}" || "$base_sha" == "0000000000000000000000000000000000000000" ]]; then
+            echo "Unable to determine a comparison base; running app CI by default."
+            echo "app_related=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          mapfile -t changed_files < <(git diff --name-only "$base_sha" "$head_sha")
+
+          if [[ "${#changed_files[@]}" -eq 0 ]]; then
+            echo "No changed files detected."
+            echo "app_related=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          printf 'Changed files:\n%s\n' "${changed_files[@]}"
+
+          app_related=false
+          for path in "${changed_files[@]}"; do
+            case "$path" in
+              Sources/*|Tests/*|Package.swift|Package.resolved|scripts/notesbridge.sh|images/notesbridge-app-icon.svg)
+                app_related=true
+                break
+                ;;
+            esac
+          done
+
+          echo "app_related=$app_related" >> "$GITHUB_OUTPUT"
+          echo "App-related changes: $app_related"
+
   test:
+    needs: changes
+    if: needs.changes.outputs.app_related == 'true'
     runs-on: macos-26
     timeout-minutes: 30
 
