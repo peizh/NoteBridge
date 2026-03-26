@@ -54,7 +54,7 @@ Commands:
   package-zip    Package an existing .app into a zip
   notarize       Submit an archive for notarization and staple the app
   appcast        Generate Sparkle appcast content
-  release-notes  Extract a release section from CHANGELOG.md
+  release-notes  Generate release notes from git history
 
 Examples:
   $0 dev
@@ -121,6 +121,46 @@ release_notes_usage() {
     cat <<EOF
 Usage: $0 release-notes VERSION
 EOF
+}
+
+notesbridge_has_version_tag() {
+    local version="${1#v}"
+    git -C "$NOTESBRIDGE_ROOT_DIR" rev-parse -q --verify "refs/tags/$version" >/dev/null 2>&1 \
+        || git -C "$NOTESBRIDGE_ROOT_DIR" rev-parse -q --verify "refs/tags/v$version" >/dev/null 2>&1
+}
+
+notesbridge_release_notes_end_ref() {
+    local version="${1#v}"
+
+    if git -C "$NOTESBRIDGE_ROOT_DIR" rev-parse -q --verify "refs/tags/$version" >/dev/null 2>&1; then
+        printf '%s\n' "$version"
+        return
+    fi
+
+    if git -C "$NOTESBRIDGE_ROOT_DIR" rev-parse -q --verify "refs/tags/v$version" >/dev/null 2>&1; then
+        printf '%s\n' "v$version"
+        return
+    fi
+
+    printf '%s\n' "HEAD"
+}
+
+notesbridge_previous_version_tag() {
+    local target_version="${1#v}"
+    local previous_ref=""
+    local raw_tag normalized_tag
+
+    while IFS= read -r raw_tag; do
+        [[ -z "${raw_tag:-}" ]] && continue
+        normalized_tag="${raw_tag#v}"
+        if [[ "$normalized_tag" == "$target_version" ]]; then
+            printf '%s\n' "$previous_ref"
+            return
+        fi
+        previous_ref="$raw_tag"
+    done < <(git -C "$NOTESBRIDGE_ROOT_DIR" tag --sort=version:refname)
+
+    printf '%s\n' "$previous_ref"
 }
 
 stop_running_app_bundle_processes() {
@@ -693,39 +733,61 @@ run_appcast_command() {
 }
 
 run_release_notes_command() {
-    local changelog_path="$ROOT_DIR/CHANGELOG.md"
     local version="${1:-}"
+    local end_ref previous_tag release_date log_range distribution_notarized commit_subject
+    local -a commits
 
     if [[ -z "$version" ]]; then
         release_notes_usage >&2
         exit 1
     fi
     version="${version#v}"
+    end_ref="$(notesbridge_release_notes_end_ref "$version")"
+    previous_tag="$(notesbridge_previous_version_tag "$version")"
+    release_date="$(git -C "$NOTESBRIDGE_ROOT_DIR" show -s --format=%cd --date=format:%Y-%m-%d "$end_ref")"
+    distribution_notarized="${NOTESBRIDGE_NOTARIZE:-0}"
 
-    local section
-    section="$(
-        awk -v version="$version" '
-            BEGIN {
-                target = "## [" version "]"
-            }
-            index($0, target) == 1 {
-                in_section = 1
-            }
-            in_section && index($0, "## [") == 1 && index($0, target) != 1 {
-                exit
-            }
-            in_section {
-                print
-            }
-        ' "$changelog_path"
-    )"
-
-    if [[ -z "$section" ]]; then
-        echo "Could not find changelog section for version $version" >&2
-        exit 1
+    if [[ -n "$previous_tag" ]]; then
+        log_range="$previous_tag..$end_ref"
+    else
+        log_range="$end_ref"
     fi
 
-    echo "$section"
+    while IFS= read -r commit_subject; do
+        [[ -z "${commit_subject:-}" ]] && continue
+        commits+=("$commit_subject")
+    done < <(
+        git -C "$NOTESBRIDGE_ROOT_DIR" log \
+            --no-merges \
+            --pretty=format:%s \
+            "$log_range" \
+        | sed '/^$/d' \
+        | grep -Ev '^(Prepare [0-9]+\.[0-9]+\.[0-9]+ release notes|Release .*)$' \
+        || true
+    )
+
+    echo "## [$version] - $release_date"
+    echo
+    echo "### Changes"
+    echo
+    if [[ "${#commits[@]}" -eq 0 ]]; then
+        echo "- No user-visible changes recorded."
+    else
+        local commit_subject
+        for commit_subject in "${commits[@]}"; do
+            echo "- $commit_subject"
+        done
+    fi
+    echo
+    echo "### Distribution"
+    echo
+    echo "- Direct-download build."
+    if [[ "$distribution_notarized" == "1" ]]; then
+        echo "- Signed and notarized."
+    else
+        echo "- Ad-hoc signed."
+        echo "- Not notarized yet."
+    fi
 }
 
 run_release_command() {
