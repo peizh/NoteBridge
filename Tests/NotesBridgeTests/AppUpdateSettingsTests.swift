@@ -127,6 +127,7 @@ struct AppUpdateSettingsTests {
                     lastFullSyncFolderCount: 19
                 )
             ),
+            appUpdater: makeNoOpAppUpdater(),
             startImmediately: false
         )
 
@@ -152,6 +153,7 @@ struct AppUpdateSettingsTests {
                     lastFullSyncFolderCount: 19
                 )
             ),
+            appUpdater: makeNoOpAppUpdater(),
             startImmediately: false
         )
 
@@ -178,6 +180,7 @@ struct AppUpdateSettingsTests {
         let model = AppModel(
             notesClient: StubAppleNotesClient(folders: folders),
             persistence: persistence,
+            appUpdater: makeNoOpAppUpdater(),
             startImmediately: false
         )
 
@@ -208,6 +211,11 @@ struct AppUpdateSettingsTests {
     @MainActor
     private func pumpMainRunLoop() {
         RunLoop.main.run(until: Date().addingTimeInterval(0.01))
+    }
+
+    @MainActor
+    private func makeNoOpAppUpdater() -> NoOpAppUpdater {
+        NoOpAppUpdater(version: AppVersion(shortVersionString: "0.2.8", buildNumber: "9"))
     }
 }
 
