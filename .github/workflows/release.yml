@@ -50,8 +50,10 @@ jobs:
             echo "notarize=0" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Extract release notes from changelog
+      - name: Generate release notes from git history
         id: notes
+        env:
+          NOTESBRIDGE_NOTARIZE: ${{ steps.meta.outputs.notarize }}
         shell: bash
         run: |
           NOTES_PATH="$RUNNER_TEMP/NotesBridge-${{ steps.meta.outputs.version }}-macOS.md"

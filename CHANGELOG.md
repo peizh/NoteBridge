@@ -2,7 +2,7 @@
 
 All notable user-visible changes to NotesBridge should be documented here.
 
-This file is the source of truth for GitHub Release notes and Sparkle update notes.
+This file documents curated user-visible changes; release notes are generated from git history during release publishing.
 
 ## [0.2.7] - 2026-03-25
 

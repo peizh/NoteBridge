@@ -71,7 +71,7 @@ Recent sync note:
 1. `./scripts/notesbridge.sh dev` builds a debug app bundle in `~/Library/Application Support/NotesBridge/NotesBridge.app` and launches it.
 2. `./scripts/notesbridge.sh bundle` produces a local `.app` bundle, generates icons, embeds Sparkle, and codesigns the app.
 3. `./scripts/notesbridge.sh release` builds the release app, packages the zip, and can optionally notarize.
-4. `./scripts/notesbridge.sh appcast` and `./scripts/notesbridge.sh release-notes` support Sparkle feed publishing and GitHub release notes.
+4. `./scripts/notesbridge.sh appcast` and `./scripts/notesbridge.sh release-notes` support Sparkle feed publishing and git-history-based GitHub release notes.
 
 ## Local Commands
 
@@ -83,7 +83,7 @@ Recent sync note:
 | `swift test` | Primary fast test pass |
 | `xcodebuild -scheme NotesBridge -workspace .swiftpm/xcode/package.xcworkspace -destination 'platform=macOS' test` | Full macOS test pass used in CI |
 | `./scripts/notesbridge.sh release` | Build release artifacts |
-| `./scripts/notesbridge.sh release-notes <version>` | Extract changelog-backed release notes |
+| `./scripts/notesbridge.sh release-notes <version>` | Generate release notes from git history |
 
 Important:
 
