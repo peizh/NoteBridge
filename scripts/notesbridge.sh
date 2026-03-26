@@ -27,17 +27,105 @@ notesbridge_resolve_version() {
     printf '%s\n' "${version#v}"
 }
 
+notesbridge_compare_versions() {
+    local version_a="${1#v}"
+    local version_b="${2#v}"
+    local a_major=0 a_minor=0 a_patch=0
+    local b_major=0 b_minor=0 b_patch=0
+
+    IFS=. read -r a_major a_minor a_patch <<< "$version_a"
+    IFS=. read -r b_major b_minor b_patch <<< "$version_b"
+
+    a_major="${a_major:-0}"
+    a_minor="${a_minor:-0}"
+    a_patch="${a_patch:-0}"
+    b_major="${b_major:-0}"
+    b_minor="${b_minor:-0}"
+    b_patch="${b_patch:-0}"
+
+    if (( a_major < b_major )); then
+        printf '%s\n' "-1"
+        return
+    fi
+    if (( a_major > b_major )); then
+        printf '%s\n' "1"
+        return
+    fi
+
+    if (( a_minor < b_minor )); then
+        printf '%s\n' "-1"
+        return
+    fi
+    if (( a_minor > b_minor )); then
+        printf '%s\n' "1"
+        return
+    fi
+
+    if (( a_patch < b_patch )); then
+        printf '%s\n' "-1"
+        return
+    fi
+    if (( a_patch > b_patch )); then
+        printf '%s\n' "1"
+        return
+    fi
+
+    printf '%s\n' "0"
+}
+
+notesbridge_default_build_number_for_version() {
+    local target_version="${1#v}"
+    local rank=0
+    local raw_tag normalized_tag comparison last_tag=""
+
+    if [[ -z "${target_version:-}" ]]; then
+        printf '%s\n' "1"
+        return
+    fi
+
+    while IFS= read -r raw_tag; do
+        [[ -z "${raw_tag:-}" ]] && continue
+        normalized_tag="${raw_tag#v}"
+        if [[ "$normalized_tag" == "$last_tag" ]]; then
+            continue
+        fi
+
+        comparison="$(notesbridge_compare_versions "$normalized_tag" "$target_version")"
+        if [[ "$comparison" == "1" ]]; then
+            break
+        fi
+
+        rank=$((rank + 1))
+        last_tag="$normalized_tag"
+
+        if [[ "$comparison" == "0" ]]; then
+            if (( rank <= 1 )); then
+                printf '%s\n' "1"
+            else
+                printf '%s\n' "$((rank - 1))"
+            fi
+            return
+        fi
+    done < <(git -C "$NOTESBRIDGE_ROOT_DIR" tag --sort=version:refname 2>/dev/null || true)
+
+    rank=$((rank + 1))
+    if (( rank <= 1 )); then
+        printf '%s\n' "1"
+    else
+        printf '%s\n' "$((rank - 1))"
+    fi
+}
+
 notesbridge_resolve_build_number() {
     local explicit_build_number="${1:-}"
+    local version="${2:-}"
     local build_number="${NOTESBRIDGE_BUILD_NUMBER:-$explicit_build_number}"
 
     if [[ -z "${build_number:-}" ]]; then
-        local commit_count
-        commit_count="$(git -C "$NOTESBRIDGE_ROOT_DIR" rev-list --count HEAD 2>/dev/null || echo 1)"
-        local commit_date
-        # Get date of HEAD commit in YYYYMMDD format
-        commit_date="$(git -C "$NOTESBRIDGE_ROOT_DIR" show -s --format=%cd --date=format:%Y%m%d HEAD 2>/dev/null || date +%Y%m%d)"
-        build_number="$commit_date.$commit_count"
+        if [[ -z "${version:-}" ]]; then
+            version="$(notesbridge_resolve_version)"
+        fi
+        build_number="$(notesbridge_default_build_number_for_version "$version")"
     fi
 
     printf '%s\n' "$build_number"
@@ -87,7 +175,7 @@ Options:
   --app-name NAME         App bundle name (default: NotesBridge)
   --bundle-id ID          CFBundleIdentifier (default: dev.notesbridge.app)
   --version VERSION       CFBundleShortVersionString (default: VERSION file or latest git tag)
-  --build-number NUMBER   CFBundleVersion (default: YYYYMMDD.commitCount from HEAD)
+  --build-number NUMBER   CFBundleVersion (default: semantic version rank from git tags)
   --sign-identity NAME    codesign identity (default: ad-hoc "-")
   --team-id TEAM          Optional TeamIdentifier for Info.plist
   --launch                Open the built app after packaging
@@ -310,7 +398,7 @@ run_bundle_command() {
     done
 
     version="$(notesbridge_resolve_version "$version")"
-    build_number="$(notesbridge_resolve_build_number "$build_number")"
+    build_number="$(notesbridge_resolve_build_number "$build_number" "$version")"
 
     local build_bin_path=""
     local executable_path=""
@@ -837,7 +925,7 @@ run_release_command() {
     done
 
     version="$(notesbridge_resolve_version "$version")"
-    build_number="$(notesbridge_resolve_build_number "$build_number")"
+    build_number="$(notesbridge_resolve_build_number "$build_number" "$version")"
 
     local app_path zip_name zip_path build_args=()
     app_path="$output_dir/$app_name.app"
